@@ -196,9 +196,6 @@ importers:
       server-only:
         specifier: ^0.0.1
         version: 0.0.1
-      shadcn:
-        specifier: ^4.22.1
-        version: 4.22.1(supports-color@10.2.2)
       sonner:
         specifier: ^2.0.8
         version: 2.0.8(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -251,6 +248,9 @@ importers:
       openapi-typescript:
         specifier: 7.13.0
         version: 7.13.0(typescript@5.9.3)
+      shadcn:
+        specifier: ^4.22.1
+        version: 4.22.1(supports-color@10.2.2)
       tailwindcss:
         specifier: ^4
         version: 4.3.3

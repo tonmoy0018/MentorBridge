@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader, SectionHeading } from "@/components/common/page-header";
+import { Pager } from "@/components/common/pager";
 import { QueryView } from "@/components/common/query-view";
 import { StatusBadge, type Tone } from "@/components/common/status-badge";
 import { useCurrentUser } from "@/components/dashboard/current-user";
@@ -60,6 +61,7 @@ const REFUND_REASON: Record<RefundReason, string> = {
   mentor_cancellation: "Mentor cancelled",
   admin: "Admin",
   dispute_lost: "Dispute lost",
+  system: "Automatic (booking didn't go ahead)",
 };
 
 const money = (m: Parameters<typeof formatMoney>[0]) => formatMoney(m, { showFree: false });
@@ -69,8 +71,12 @@ export function AdminPayments() {
   const { user } = useCurrentUser();
   const [status, setStatus] = useState<PaymentStatus | "">("");
   const [refunding, setRefunding] = useState<PaymentRecord | null>(null);
-  const query = useApiQuery(`admin:payments:${status}`, () => api.admin.payments({ status: status || undefined }));
-  const refunds = useApiQuery("admin:refunds", () => api.admin.refunds());
+  const [page, setPage] = useState(1);
+  const [refundPage, setRefundPage] = useState(1);
+  const query = useApiQuery(`admin:payments:${status}:${page}`, () =>
+    api.admin.payments({ status: status || undefined, page }),
+  );
+  const refunds = useApiQuery(`admin:refunds:${refundPage}`, () => api.admin.refunds(refundPage));
 
   return (
     <div className="grid grid-cols-1 gap-6">
@@ -85,7 +91,10 @@ export function AdminPayments() {
             <NativeSelect
               id="payment-status"
               value={status}
-              onChange={(e) => setStatus(e.target.value as PaymentStatus | "")}
+              onChange={(e) => {
+                setStatus(e.target.value as PaymentStatus | "");
+                setPage(1);
+              }}
               className="w-44"
             >
               <option value="">All statuses</option>
@@ -170,6 +179,7 @@ export function AdminPayments() {
           )
         }
       </QueryView>
+      <Pager page={page} count={query.data?.count ?? 0} onPageChange={setPage} />
 
       <section aria-labelledby="refunds-heading" className="grid grid-cols-1 gap-3">
         <SectionHeading id="refunds-heading" title="Refunds" />
@@ -219,6 +229,7 @@ export function AdminPayments() {
             )
           }
         </QueryView>
+        <Pager page={refundPage} count={refunds.data?.count ?? 0} onPageChange={setRefundPage} />
       </section>
 
       {refunding ? (

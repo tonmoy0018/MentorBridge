@@ -35,7 +35,11 @@ export function safeNextPath(raw: string | null | undefined, fallback: string): 
   try {
     const url = new URL(raw, "http://internal.invalid");
     if (url.origin !== "http://internal.invalid") return fallback;
-    return `${url.pathname}${url.search}${url.hash}`;
+    const path = `${url.pathname}${url.search}${url.hash}`;
+    // Check the *normalised* result too: dot-segments can turn "/.//evil.example" into
+    // "//evil.example", a protocol-relative (off-site) URL.
+    if (path.startsWith("//") || path.startsWith("/\\")) return fallback;
+    return path;
   } catch {
     return fallback;
   }

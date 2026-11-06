@@ -18,6 +18,7 @@ import { ErrorState } from "@/components/feedback/error-state";
 import { NativeSelect } from "@/components/forms/native-select";
 import { loginRedirectPath } from "@/hooks/use-api-error-handler";
 import { useApiQuery } from "@/hooks/use-api-query";
+import { useReloadOnBack } from "@/hooks/use-reload-on-back";
 
 const LOOKAHEAD_DAYS = 21;
 
@@ -55,6 +56,7 @@ export function BookingWidget({
   const router = useRouter();
   const pathname = usePathname();
   const selectId = useId();
+  useReloadOnBack();
   const isBookable = (s: MentorService) => paymentsEnabled || s.price.amount_cents === 0;
   const [serviceId, setServiceId] = useState(
     services.some((s) => s.id === initialServiceId)
@@ -107,7 +109,7 @@ export function BookingWidget({
         router.push(loginRedirectPath(pathname));
         return;
       }
-      if (isApiError(error) && error.kind === "forbidden") {
+      if (isApiError(error) && error.kind === "forbidden" && error.code === "permission_denied") {
         throw new Error("Only student accounts can book sessions.");
       }
       if (isApiError(error) && error.kind === "conflict") {

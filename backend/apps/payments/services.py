@@ -276,7 +276,21 @@ def _on_captured(payment, event, provider) -> str:
         logger.error("Payment %s captured amount mismatch", payment.pk)
         return "amount_mismatch"
     changed = _set_status(payment, PaymentStatus.CAPTURED, captured_at=payment.captured_at or timezone.now())
-    return "captured" if changed else "noop"
+    if not changed:
+        return "noop"
+    # We only capture when a mentor accepts. Reaching here means our own record of that capture
+    # was lost (e.g. the accept transaction rolled back after the provider call succeeded).
+    from apps.bookings.models import BookingStatus
+    from apps.bookings.services import confirm_after_capture
+
+    booking = payment.booking
+    if booking.status == BookingStatus.REQUESTED:
+        confirm_after_capture(booking)
+        return "captured_confirmed"
+    if booking.status not in (BookingStatus.CONFIRMED, BookingStatus.COMPLETED):
+        refund_stranded_capture(booking)
+        return "captured_refunding"
+    return "captured"
 
 
 def _on_failed(payment, event, provider) -> str:
@@ -338,8 +352,9 @@ def _on_dispute(payment, event, provider) -> str:
     payment.dispute_status = status
     payment.save(update_fields=["dispute_status", "updated_at"])
     if status == DisputeStatus.LOST:
-        # The provider has returned the money to the cardholder: reverse it like a refund.
-        remaining = payment.amount_cents - payment.refunded_amount_cents
+        # The provider has returned the money to the cardholder: reverse it like a refund. Money
+        # already being refunded is excluded, so the totals can never exceed the payment.
+        remaining = refundable_cents(payment)
         amount = min(event.amount_cents or remaining, remaining)
         if amount > 0:
             reversed_commission, reversed_share = commission.proportional_reversal(payment, amount)
@@ -373,6 +388,10 @@ def capture_for_booking(booking) -> Payment | None:
         return None
     payment = _open_payment(booking, PaymentStatus.AUTHORIZED)
     if payment is None:
+        # Already captured (e.g. a retried accept after the provider's capture went through).
+        already = _open_payment(booking, PaymentStatus.CAPTURED)
+        if already is not None:
+            return already
         raise Conflict("payment_required", "This booking has no authorised payment to capture.")
     try:
         result = _provider().capture(payment)
@@ -426,6 +445,26 @@ def release_for_booking(booking, *, reason: str) -> None:
         except ProviderError as exc:
             logger.warning("Couldn't expire checkout for payment %s: %s", open_checkout.pk, exc.code)
         _set_status(open_checkout, PaymentStatus.CANCELLED, failure_code=reason)
+
+
+def refund_stranded_capture(booking) -> None:
+    """
+    Refund in full a payment that was captured for a booking that will never take place
+    (declined, expired or cancelled before confirmation). Runs after commit, like other refunds.
+    """
+    payment = Payment.objects.filter(booking=booking, status=PaymentStatus.CAPTURED).first()
+    if payment is None or refundable_cents(payment) == 0:
+        return
+    logger.error("Payment %s was captured for closed booking %s; refunding", payment.pk, booking.pk)
+    transaction.on_commit(
+        lambda: create_refund(
+            payment,
+            amount_cents=None,
+            reason=RefundReason.SYSTEM,
+            note="Captured for a booking that didn't go ahead.",
+        ),
+        robust=True,
+    )
 
 
 def refundable_cents(payment: Payment) -> int:

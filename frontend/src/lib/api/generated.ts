@@ -2562,9 +2562,10 @@ export interface components {
          *     * `mentor_cancellation` - Mentor cancelled
          *     * `admin` - Issued by an administrator
          *     * `dispute_lost` - Dispute lost
+         *     * `system` - Automatic: the booking couldn't go ahead
          * @enum {string}
          */
-        RefundReasonEnum: "student_cancellation" | "mentor_cancellation" | "admin" | "dispute_lost";
+        RefundReasonEnum: "student_cancellation" | "mentor_cancellation" | "admin" | "dispute_lost" | "system";
         /**
          * @description * `pending` - Pending
          *     * `succeeded` - Succeeded

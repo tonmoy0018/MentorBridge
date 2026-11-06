@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "@/components/common/page-header";
+import { Pager } from "@/components/common/pager";
 import { QueryView } from "@/components/common/query-view";
 import { StatusBadge } from "@/components/common/status-badge";
 import { useCurrentUser } from "@/components/dashboard/current-user";
@@ -24,14 +25,16 @@ export function AdminUsers() {
   const { user: me } = useCurrentUser();
   const [filters, setFilters] = useState<{ q: string; role: Role | "" }>({ q: "", role: "" });
   const [target, setTarget] = useState<AdminUser | null>(null);
-  const query = useApiQuery(`admin:users:${filters.q}:${filters.role}`, () =>
-    api.admin.users({ q: filters.q || undefined, role: filters.role || undefined }),
+  const [page, setPage] = useState(1);
+  const query = useApiQuery(`admin:users:${filters.q}:${filters.role}:${page}`, () =>
+    api.admin.users({ q: filters.q || undefined, role: filters.role || undefined, page }),
   );
 
   function onSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     setFilters({ q: String(data.get("q") ?? "").trim(), role: (String(data.get("role") ?? "") as Role | "") });
+    setPage(1);
   }
 
   const replace = (updated: AdminUser) =>
@@ -105,6 +108,7 @@ export function AdminUsers() {
           )
         }
       </QueryView>
+      <Pager page={page} count={query.data?.count ?? 0} onPageChange={setPage} />
 
       <ConfirmationDialog
         open={target !== null && target.is_active}

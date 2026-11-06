@@ -85,7 +85,9 @@ def deliver(notification_id) -> bool:
         return False
     try:
         subject = render_to_string(
-            f"notifications/email/{notification.template}.subject.txt", notification.context
+            f"notifications/email/{notification.template}.subject.txt",
+            notification.context,
+            using="email_text",
         )
         body = render_to_string(
             f"notifications/email/{notification.template}.txt", notification.context, using="email_text"

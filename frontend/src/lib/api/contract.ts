@@ -88,6 +88,8 @@ export interface DataApi {
   };
   bookings: {
     list(params?: BookingListParams): Promise<Paginated<Booking>>;
+    /** Every booking matching `params`, following pagination (bounded). */
+    listAll(params?: BookingListParams): Promise<Booking[]>;
     get(id: string): Promise<Booking>;
     create(input: CreateBookingInput): Promise<Booking>;
     cancel(id: string, reason: string): Promise<Booking>;
@@ -99,7 +101,9 @@ export interface DataApi {
     checkout(id: string): Promise<Checkout>;
   };
   student: {
-    savedMentors(): Promise<Paginated<MentorSummary>>;
+    savedMentors(page?: number): Promise<Paginated<MentorSummary>>;
+    /** Whether the student has saved this mentor (checks every page of saved mentors). */
+    isSaved(mentorIdOrSlug: string): Promise<boolean>;
     saveMentor(mentorId: string): Promise<void>;
     unsaveMentor(mentorId: string): Promise<void>;
     goals(): Promise<CareerGoal[]>;
@@ -120,28 +124,28 @@ export interface DataApi {
     replaceAvailabilityRules(rules: AvailabilityRule[]): Promise<AvailabilityRule[]>;
     submitVerification(evidenceNote: string): Promise<MentorOwnProfile>;
     earningsSummary(): Promise<EarningsSummary>;
-    ledger(): Promise<Paginated<LedgerEntry>>;
-    payouts(): Promise<Paginated<Payout>>;
+    ledger(page?: number): Promise<Paginated<LedgerEntry>>;
+    payouts(page?: number): Promise<Paginated<Payout>>;
   };
   admin: {
     stats(params?: AdminStatsParams): Promise<AdminStats>;
     users(params?: AdminUserParams): Promise<Paginated<AdminUser>>;
     suspendUser(id: string, reason: string): Promise<AdminUser>;
     reactivateUser(id: string): Promise<AdminUser>;
-    verificationRequests(status: VerificationRequestStatus): Promise<Paginated<VerificationRequest>>;
+    verificationRequests(status: VerificationRequestStatus, page?: number): Promise<Paginated<VerificationRequest>>;
     approveVerification(id: string): Promise<VerificationRequest>;
     rejectVerification(id: string, reason: string): Promise<VerificationRequest>;
-    bookings(params?: { status?: BookingStatus }): Promise<Paginated<Booking>>;
+    bookings(params?: { status?: BookingStatus; page?: number }): Promise<Paginated<Booking>>;
     cancelBooking(id: string, input: AdminCancelInput): Promise<Booking>;
-    payments(params?: { status?: PaymentStatus; livemode?: boolean }): Promise<Paginated<PaymentRecord>>;
+    payments(params?: { status?: PaymentStatus; livemode?: boolean; page?: number }): Promise<Paginated<PaymentRecord>>;
     refundPayment(id: string, input: RefundInput): Promise<RefundRecord>;
-    refunds(): Promise<Paginated<RefundRecord>>;
-    reviews(params?: { status?: ReviewStatus }): Promise<Paginated<AdminReview>>;
+    refunds(page?: number): Promise<Paginated<RefundRecord>>;
+    reviews(params?: { status?: ReviewStatus; page?: number }): Promise<Paginated<AdminReview>>;
     hideReview(id: string, reason: string): Promise<AdminReview>;
     publishReview(id: string): Promise<AdminReview>;
     auditLog(params?: { action?: string; page?: number }): Promise<Paginated<AuditLogEntry>>;
     notifications(params?: { status?: string; page?: number }): Promise<Paginated<AdminNotification>>;
-    reports(status: ReportStatus | "resolved"): Promise<Paginated<ContentReport>>;
+    reports(status: ReportStatus | "resolved", page?: number): Promise<Paginated<ContentReport>>;
     resolveReport(id: string, input: ResolveReportInput): Promise<ContentReport>;
   };
 }

@@ -28,6 +28,9 @@ export function toMentorQuery(params: MentorSearchParams) {
 
 const id = (value: string) => encodeURIComponent(value);
 
+/** Upper bound when following pagination (100 per page → 2,000 items). */
+const MAX_PAGES = 20;
+
 export function createLiveAuthApi(request: Transport): AuthApi {
   return {
     login: (input) => request("/auth/login/", { method: "POST", body: input }),
@@ -80,6 +83,17 @@ export function createLiveDataApi(request: Transport): DataApi {
     bookings: {
       list: (params = {}) =>
         request("/bookings/", { query: { scope: params.scope, status: params.status } }),
+      listAll: async (params = {}) => {
+        const all: Booking[] = [];
+        for (let page = 1; page <= MAX_PAGES; page += 1) {
+          const result = await request<Paginated<Booking>>("/bookings/", {
+            query: { scope: params.scope, status: params.status, page, page_size: 100 },
+          });
+          all.push(...result.results);
+          if (!result.next) break;
+        }
+        return all;
+      },
       get: (bookingId) => request(`/bookings/${id(bookingId)}/`),
       create: (input) => request("/bookings/", { method: "POST", body: input }),
       cancel: (bookingId, reason) => action(bookingId, "cancel", { reason }),
@@ -91,7 +105,17 @@ export function createLiveDataApi(request: Transport): DataApi {
       checkout: (bookingId) => request(`/bookings/${id(bookingId)}/checkout/`, { method: "POST" }),
     },
     student: {
-      savedMentors: () => request("/me/student/saved-mentors/"),
+      savedMentors: (page) => request("/me/student/saved-mentors/", { query: { page } }),
+      isSaved: async (mentorIdOrSlug) => {
+        for (let page = 1; page <= MAX_PAGES; page += 1) {
+          const result = await request<Paginated<MentorSummaryRow>>("/me/student/saved-mentors/", {
+            query: { page, page_size: 100 },
+          });
+          if (result.results.some((m) => m.id === mentorIdOrSlug || m.slug === mentorIdOrSlug)) return true;
+          if (!result.next) return false;
+        }
+        return false;
+      },
       saveMentor: (mentorId) =>
         request(`/me/student/saved-mentors/${id(mentorId)}/`, { method: "PUT" }),
       unsaveMentor: (mentorId) =>
@@ -128,8 +152,8 @@ export function createLiveDataApi(request: Transport): DataApi {
           body: { evidence_note: evidenceNote },
         }),
       earningsSummary: () => request("/me/mentor/earnings/summary/"),
-      ledger: () => request("/me/mentor/earnings/ledger/"),
-      payouts: () => request("/me/mentor/payouts/"),
+      ledger: (page) => request("/me/mentor/earnings/ledger/", { query: { page } }),
+      payouts: (page) => request("/me/mentor/payouts/", { query: { page } }),
     },
     admin: {
       stats: (params = {}) => request("/admin/stats/", { query: { ...params } }),
@@ -138,8 +162,8 @@ export function createLiveDataApi(request: Transport): DataApi {
         request(`/admin/users/${id(userId)}/suspend/`, { method: "POST", body: { reason } }),
       reactivateUser: (userId) =>
         request(`/admin/users/${id(userId)}/reactivate/`, { method: "POST" }),
-      verificationRequests: (status) =>
-        request("/admin/verification-requests/", { query: { status } }),
+      verificationRequests: (status, page) =>
+        request("/admin/verification-requests/", { query: { status, page } }),
       approveVerification: (requestId) =>
         request(`/admin/verification-requests/${id(requestId)}/approve/`, { method: "POST" }),
       rejectVerification: (requestId, reason) =>
@@ -153,7 +177,7 @@ export function createLiveDataApi(request: Transport): DataApi {
       payments: (params = {}) => request("/admin/payments/", { query: { ...params } }),
       refundPayment: (paymentId, input) =>
         request(`/admin/payments/${id(paymentId)}/refund/`, { method: "POST", body: input }),
-      refunds: () => request("/admin/refunds/"),
+      refunds: (page) => request("/admin/refunds/", { query: { page } }),
       reviews: (params = {}) => request("/admin/reviews/", { query: { ...params } }),
       hideReview: (reviewId, reason) =>
         request(`/admin/reviews/${id(reviewId)}/hide/`, { method: "POST", body: { reason } }),
@@ -161,7 +185,7 @@ export function createLiveDataApi(request: Transport): DataApi {
         request(`/admin/reviews/${id(reviewId)}/publish/`, { method: "POST", body: {} }),
       auditLog: (params = {}) => request("/admin/audit-log/", { query: { ...params } }),
       notifications: (params = {}) => request("/admin/notifications/", { query: { ...params } }),
-      reports: (status) => request("/admin/reports/", { query: { status } }),
+      reports: (status, page) => request("/admin/reports/", { query: { status, page } }),
       resolveReport: (reportId, input) =>
         request(`/admin/reports/${id(reportId)}/resolve/`, { method: "POST", body: input }),
     },
@@ -169,5 +193,6 @@ export function createLiveDataApi(request: Transport): DataApi {
 }
 
 type DataTaxonomy = Awaited<ReturnType<DataApi["taxonomy"]["get"]>>;
+type MentorSummaryRow = Awaited<ReturnType<DataApi["mentors"]["search"]>>["results"][number];
 type DataGoal = Awaited<ReturnType<DataApi["student"]["goals"]>>[number];
 type DataService = Awaited<ReturnType<DataApi["mentor"]["services"]>>[number];

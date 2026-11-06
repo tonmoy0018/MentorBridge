@@ -235,20 +235,22 @@ All secrets come from environment variables, and `.env.example` documents every 
 | Concern | Control |
 |---|---|
 | Password storage | Django hashers (PBKDF2 default; Argon2 when `argon2-cffi` added); password validators |
-| Session security | HttpOnly/Secure/SameSite=Lax cookies; session rotation on login; logout invalidates the server session |
+| Session security | HttpOnly/Secure/SameSite=Lax cookies; session rotation on login; logout invalidates the server session; suspension deletes the user's sessions (reactivation doesn't revive them) |
 | CSRF | Django CSRF middleware + DRF `SessionAuthentication`; `CSRF_TRUSTED_ORIGINS` set to the public origin; only the webhook endpoint is exempt (signature-verified instead) |
 | Authorization | Role permissions + per-object queryset scoping; 404 for foreign objects |
 | Input validation | DRF serializers (server, authoritative) + Zod (client, UX only); DB `CHECK` constraints on ratings, prices, durations, time ranges |
-| Rate limiting | DRF scoped throttles on login, register, password reset, booking creation, report creation; DB-backed cache so limits hold across worker processes |
+| Rate limiting | DRF scoped throttles on login (per IP and per account, with look-alike emails folded together), register, password reset, booking creation, report creation; the Django admin login is throttled too (per IP and account). DB-backed cache so limits hold across worker processes. Server-rendered pages forward the visitor's IP, so SSR traffic isn't one shared bucket |
+| Abuse limits | At most `MAX_PENDING_BOOKINGS_PER_STUDENT` (5) unconfirmed bookings per student and 2 per student–mentor pair, so one account can't block calendars. Search uses subqueries (no join blow-up), and production sets a 30 s PostgreSQL `statement_timeout` |
 | Booking integrity | Row locks + Postgres exclusion constraints |
 | Payment integrity | Server-computed amounts; webhook signature verification; unique event IDs; monotonic state; provider idempotency keys; frontend success messages ignored |
-| Data exposure | Separate public/private serializers; student contact info visible only to the mentor of a confirmed booking |
-| Uploads | Image type sniffing + size limits; randomized storage names; served from a separate media path/bucket |
-| Headers | `SECURE_*` settings, HSTS in prod, `X-Content-Type-Options`, `Referrer-Policy`, CSP via Next.js headers |
-| Logging | Structured JSON logs with request ID; scrubbing of `password`, `token`, `card`, `authorization`, cookies |
-| Audit | `AuditLogEntry` for admin actions; `BookingEvent` for booking transitions |
+| Data exposure | Separate public/private serializers. No email addresses or contact details are exposed to other users; the meeting link only to participants of a confirmed booking; payment records only to admins |
+| Uploads | Content-based image validation (Pillow; JPEG/PNG/WebP; 2 MB; 4000 px; decompression bombs rejected); random storage names; served by the reverse proxy with `nosniff` and a sandboxing CSP |
+| Headers | `SECURE_*` settings, HSTS in prod, `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options: DENY`; a Content-Security-Policy on production builds (`frame-ancestors 'none'`, same-origin scripts and connections; `'unsafe-inline'` remains for Next.js's inline scripts) |
+| Redirects | `?next=` after login accepts same-site paths only, checked after URL normalisation (dot-segments can't produce `//host`); checkout follows https URLs only |
+| Logging | Plain-text logs to stdout with a request ID. Code logs identifiers and error codes only, never emails, tokens, request bodies or payment payloads (asserted by tests for notifications). Access logs record the forwarded client IP |
+| Audit | `AuditLogEntry` for admin actions, refund failures and disputes; `BookingEvent` for booking transitions. Reviews, payments, refunds and webhooks are read-only in Django admin |
 | Secrets | Env vars only; `.env` git-ignored; no secrets in fixtures or tests |
-| Dependencies | Lockfiles; `pip-audit` and `pnpm audit` in CI |
+| Dependencies | Pinned requirements and a pnpm lockfile. No CI yet: `pnpm audit` is run manually, and `pip-audit` / CI are open items (roadmap M7) |
 
 ## 8. Key architectural decisions (ADR summary)
 

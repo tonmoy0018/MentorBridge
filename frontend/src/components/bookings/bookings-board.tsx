@@ -44,7 +44,12 @@ const TABS: Record<Perspective, TabDef[]> = {
 
 export function BookingsBoard({ perspective }: { perspective: Perspective }) {
   const { user } = useCurrentUser();
-  const query = useApiQuery(`bookings:${perspective}`, () => api.bookings.list({ scope: "all" }));
+  // All of the user's bookings: the tabs filter them client-side, so a single page would drop
+  // the newest ones once someone has more than a page of history.
+  const query = useApiQuery(`bookings:${perspective}`, async () => {
+    const results = await api.bookings.listAll({ scope: "all" });
+    return { count: results.length, next: null, previous: null, results };
+  });
   const tabs = TABS[perspective];
 
   const replace = (updated: Booking) =>

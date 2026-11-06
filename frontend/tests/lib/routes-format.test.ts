@@ -9,6 +9,11 @@ describe("safeNextPath", () => {
     ["//evil.example", "/fallback"],
     ["/\\evil.example", "/fallback"],
     ["javascript:alert(1)", "/fallback"],
+    // Dot-segments that normalise to a protocol-relative URL.
+    ["/.//evil.example", "/fallback"],
+    ["/a/..//evil.example", "/fallback"],
+    ["/%2e//evil.example", "/fallback"],
+    ["/./\\evil.example", "/fallback"],
     ["", "/fallback"],
     [null, "/fallback"],
   ])("safeNextPath(%s) → %s", (input, expected) => {

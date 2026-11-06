@@ -1,5 +1,5 @@
 /**
- * Normalized API errors. Every failure from the HTTP layer (or the mock layer) is an
+ * Normalized API errors. Every failure from the HTTP layer is an
  * ApiError so UI code can branch on `kind` instead of raw status codes.
  */
 export type ApiErrorKind =

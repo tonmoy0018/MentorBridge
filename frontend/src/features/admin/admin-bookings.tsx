@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BookingStatusBadge, bookingStatusLabel } from "@/components/bookings/booking-status-badge";
 import { PageHeader } from "@/components/common/page-header";
+import { Pager } from "@/components/common/pager";
 import { QueryView } from "@/components/common/query-view";
 import { useCurrentUser } from "@/components/dashboard/current-user";
 import { ConfirmationDialog } from "@/components/feedback/confirmation-dialog";
@@ -26,7 +27,10 @@ export function AdminBookings() {
   const [status, setStatus] = useState<BookingStatus | "">("");
   const [cancelling, setCancelling] = useState<Booking | null>(null);
   const [refund, setRefund] = useState(true);
-  const query = useApiQuery(`admin:bookings:${status}`, () => api.admin.bookings({ status: status || undefined }));
+  const [page, setPage] = useState(1);
+  const query = useApiQuery(`admin:bookings:${status}:${page}`, () =>
+    api.admin.bookings({ status: status || undefined, page }),
+  );
 
   return (
     <div className="grid grid-cols-1 gap-6">
@@ -38,7 +42,10 @@ export function AdminBookings() {
             <label htmlFor="booking-status" className="text-sm whitespace-nowrap text-muted-foreground">
               Status
             </label>
-            <NativeSelect id="booking-status" value={status} onChange={(e) => setStatus(e.target.value as BookingStatus | "")} className="w-48">
+            <NativeSelect id="booking-status" value={status} onChange={(e) => {
+                setStatus(e.target.value as BookingStatus | "");
+                setPage(1);
+              }} className="w-48">
               <option value="">All statuses</option>
               {STATUSES.map((s) => (
                 <option key={s} value={s}>
@@ -103,6 +110,7 @@ export function AdminBookings() {
           )
         }
       </QueryView>
+      <Pager page={page} count={query.data?.count ?? 0} onPageChange={setPage} />
       <ConfirmationDialog
         open={cancelling !== null}
         onOpenChange={(open) => !open && setCancelling(null)}

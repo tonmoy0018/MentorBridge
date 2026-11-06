@@ -1,0 +1,144 @@
+# Production stack (docs/DEPLOYMENT.md): Caddy (HTTPS) → Next.js + Django/gunicorn → PostgreSQL.
+# Only Caddy publishes ports. All configuration comes from deploy/.env (never committed).
+#
+#   cd deploy && cp production.env.example .env   # then fill in real values
+#   docker compose -f docker-compose.prod.yml build
+#   docker compose -f docker-compose.prod.yml run --rm backend python manage.py migrate
+#   docker compose -f docker-compose.prod.yml up -d
+name: mentorbridge-prod
+
+x-backend-env: &backend-env
+  DJANGO_SETTINGS_MODULE: config.settings.prod
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set DJANGO_SECRET_KEY in deploy/.env}
+  # "backend" is the internal host Next.js uses for server-side API calls.
+  DJANGO_ALLOWED_HOSTS: ${SITE_DOMAIN:?set SITE_DOMAIN in deploy/.env},backend
+  DJANGO_CSRF_TRUSTED_ORIGINS: https://${SITE_DOMAIN}
+  DJANGO_USE_X_FORWARDED_HOST: "true"
+  DJANGO_ADMIN_URL: ${DJANGO_ADMIN_URL:-django-admin/}
+  NUM_PROXIES: "1"
+  FRONTEND_URL: https://${SITE_DOMAIN}
+  DATABASE_URL: postgres://${POSTGRES_USER:-mentorbridge}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}@db:5432/${POSTGRES_DB:-mentorbridge}
+  EMAIL_HOST: ${EMAIL_HOST:?set EMAIL_HOST in deploy/.env}
+  EMAIL_PORT: ${EMAIL_PORT:-587}
+  EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+  EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+  EMAIL_USE_TLS: ${EMAIL_USE_TLS:-true}
+  DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:?set DEFAULT_FROM_EMAIL in deploy/.env}
+  PLATFORM_CURRENCY: ${PLATFORM_CURRENCY:-USD}
+  PLATFORM_FEE_BPS: ${PLATFORM_FEE_BPS:-1500}
+  BOOKING_HOLD_MINUTES: ${BOOKING_HOLD_MINUTES:-30}
+  MENTOR_RESPONSE_HOURS: ${MENTOR_RESPONSE_HOURS:-48}
+  FREE_CANCELLATION_HOURS: ${FREE_CANCELLATION_HOURS:-24}
+  REQUIRE_VERIFIED_EMAIL: ${REQUIRE_VERIFIED_EMAIL:-true}
+  PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-}
+  STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+  STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+x-backend: &backend
+  build:
+    context: ../backend
+    args:
+      REQUIREMENTS: requirements.txt
+  image: mentorbridge-backend:prod
+  environment:
+    <<: *backend-env
+  volumes:
+    - media:/app/media
+    - static:/app/staticfiles
+  depends_on:
+    db:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  db:
+    image: postgres:17.11
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mentorbridge}
+      POSTGRES_USER: ${POSTGRES_USER:-mentorbridge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    <<: *backend
+    command:
+      - sh
+      - -c
+      - >-
+        python manage.py collectstatic --noinput &&
+        python manage.py createcachetable &&
+        exec gunicorn config.wsgi:application --bind 0.0.0.0:8000
+        --workers ${GUNICORN_WORKERS:-3} --timeout 30 --access-logfile -
+        --access-logformat '%({x-forwarded-for}i)s "%(r)s" %(s)s %(b)s %(M)sms "%(a)s"'
+    healthcheck:
+      # Sent as an internal HTTPS-proxied request so the HTTPS redirect doesn't apply.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request as u; u.urlopen(u.Request('http://localhost:8000/api/v1/health/', headers={'Host': 'backend', 'X-Forwarded-Proto': 'https'}), timeout=5)"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  scheduler:
+    <<: *backend
+    # Holds/requests expiry, session reminders and email retries, every minute.
+    command: >
+      sh -c "while true; do
+               python manage.py expire_bookings || true;
+               python manage.py send_session_reminders || true;
+               python manage.py send_notifications || true;
+               sleep 60;
+             done"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../frontend
+      args:
+        INTERNAL_API_URL: http://backend:8000
+    image: mentorbridge-frontend:prod
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.10.2
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in deploy/.env}
+      DJANGO_ADMIN_URL: ${DJANGO_ADMIN_URL:-django-admin/}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - static:/srv/static:ro
+      - media:/srv/media:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  media:
+  static:
+  caddy_data:
+  caddy_config:

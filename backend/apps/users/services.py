@@ -7,7 +7,7 @@ from django.conf import settings
 from django.contrib.auth import password_validation
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from apps.common.models import record_audit
@@ -41,7 +41,11 @@ def register_user(*, email: str, password: str, first_name: str, last_name: str,
     )
     password_validation.validate_password(password, user=user)
     user.set_password(password)
-    user.save()
+    try:
+        with transaction.atomic():
+            user.save()
+    except IntegrityError as exc:  # a concurrent registration with the same email won the race
+        raise ValidationError({"email": "An account with this email already exists."}) from exc
 
     if role == Role.MENTOR:
         from apps.mentors.services import create_mentor_profile
@@ -110,8 +114,24 @@ def set_active(*, user: User, active: bool, actor: User, reason: str = "", reque
     """Suspend or reactivate an account. Inactive users can't log in and their sessions stop working."""
     user.is_active = active
     user.save(update_fields=["is_active", "updated_at"])
+    if not active:
+        # End existing sessions now, so reactivation doesn't revive a session that may have
+        # been the reason for the suspension.
+        end_sessions(user)
     record_audit(
         actor, "user.reactivated" if active else "user.suspended", user, {"reason": reason}, request=request
     )
     logger.info("User %s %s by %s", user.pk, "reactivated" if active else "suspended", actor.pk)
     return user
+
+
+def end_sessions(user: User) -> int:
+    """Delete every unexpired database session that belongs to `user`."""
+    from django.contrib.sessions.models import Session
+
+    ended = 0
+    for session in Session.objects.filter(expire_date__gt=timezone.now()).iterator():
+        if session.get_decoded().get("_auth_user_id") == str(user.pk):
+            session.delete()
+            ended += 1
+    return ended

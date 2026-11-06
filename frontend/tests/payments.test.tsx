@@ -8,7 +8,11 @@ import { goToCheckout } from "@/lib/checkout";
 
 const getBooking = vi.fn();
 let search = new URLSearchParams();
-vi.mock("next/navigation", () => ({ useSearchParams: () => search }));
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => search,
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  usePathname: () => "/dashboard/student/bookings",
+}));
 vi.mock("@/lib/data/client", () => ({ api: { bookings: { get: (id: string) => getBooking(id) } } }));
 
 const HOUR = 3_600_000;

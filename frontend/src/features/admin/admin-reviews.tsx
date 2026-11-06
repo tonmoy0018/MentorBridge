@@ -10,6 +10,7 @@ import { formatDateTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/common/page-header";
+import { Pager } from "@/components/common/pager";
 import { QueryView } from "@/components/common/query-view";
 import { StatusBadge } from "@/components/common/status-badge";
 import { useCurrentUser } from "@/components/dashboard/current-user";
@@ -22,7 +23,8 @@ export function AdminReviews() {
   const { user } = useCurrentUser();
   const [tab, setTab] = useState<ReviewStatus>("published");
   const [acting, setActing] = useState<AdminReview | null>(null);
-  const query = useApiQuery(`admin:reviews:${tab}`, () => api.admin.reviews({ status: tab }));
+  const [page, setPage] = useState(1);
+  const query = useApiQuery(`admin:reviews:${tab}:${page}`, () => api.admin.reviews({ status: tab, page }));
 
   const removeFromList = (id: string) =>
     query.mutate((p) => ({ ...p, count: p.count - 1, results: p.results.filter((r) => r.id !== id) }));
@@ -33,7 +35,10 @@ export function AdminReviews() {
         title="Reviews"
         description="Hide reviews that break the content rules. Hidden reviews leave the mentor's profile and rating; publishing restores them."
       />
-      <Tabs value={tab} onValueChange={(v) => setTab(v as ReviewStatus)}>
+      <Tabs value={tab} onValueChange={(v) => {
+          setTab(v as ReviewStatus);
+          setPage(1);
+        }}>
         <TabsList>
           <TabsTrigger value="published" className="px-3">
             Published
@@ -88,6 +93,7 @@ export function AdminReviews() {
           )
         }
       </QueryView>
+      <Pager page={page} count={query.data?.count ?? 0} onPageChange={setPage} />
       <ConfirmationDialog
         open={acting !== null}
         onOpenChange={(open) => !open && setActing(null)}

@@ -5,6 +5,7 @@ from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from apps.bookings.urls import admin_urlpatterns as booking_admin
+from apps.common.admin_security import throttle_admin_login
 from apps.common.admin_views import AdminAuditLogView, AdminStatsView
 from apps.common.views import HealthView, PublicConfigView
 from apps.mentors.urls import admin_urlpatterns as mentor_admin
@@ -49,6 +50,9 @@ api_v1 = [
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
     path("docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="docs"),
 ]
+
+# Must be wrapped before `admin.site.urls` is built, which binds the login view.
+admin.site.login = throttle_admin_login(admin.site.login)
 
 urlpatterns = [
     path("api/v1/", include(api_v1)),

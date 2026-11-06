@@ -21,6 +21,7 @@ A two-sided mentorship marketplace: students and early-career professionals disc
 | [API specification](docs/API_SPECIFICATION.md) | Implemented endpoints, permissions, errors, pagination, booking rules |
 | [OpenAPI schema](docs/openapi.yaml) | Generated, machine-readable API contract |
 | [Payments](docs/PAYMENTS.md) | Provider research, payment workflow, commission and accounting, webhooks, refunds, configuration, test status |
+| [Deployment](docs/DEPLOYMENT.md) | Local setup, production configuration (`deploy/`), deploy steps, smoke tests, backups, rollback |
 | [Notifications](docs/NOTIFICATIONS.md) | Transactional emails, de-duplication, privacy, configuration |
 | [Development roadmap](docs/DEVELOPMENT_ROADMAP.md) | Milestones, task checklist, blockers, milestone log |
 
@@ -35,6 +36,7 @@ A two-sided mentorship marketplace: students and early-career professionals disc
 ## Repository layout
 
 ```
+deploy/      Production compose file, Caddyfile (HTTPS reverse proxy), production env template
 backend/     Django project (config/ + apps/: common, users, students, mentors, bookings, payments, reviews, moderation, notifications)
 frontend/    Next.js app (src/app, src/components, src/features, src/lib, tests/, e2e/) — see frontend/README.md
 docs/        Product, architecture, schema, API and roadmap docs

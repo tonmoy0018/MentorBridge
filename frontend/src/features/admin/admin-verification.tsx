@@ -9,6 +9,7 @@ import { countryName, formatDateTime, pluralize } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/common/page-header";
+import { Pager } from "@/components/common/pager";
 import { QueryView } from "@/components/common/query-view";
 import { StatusBadge } from "@/components/common/status-badge";
 import { useCurrentUser } from "@/components/dashboard/current-user";
@@ -28,7 +29,8 @@ export function AdminVerification() {
   const { user } = useCurrentUser();
   const [status, setStatus] = useState<VerificationRequestStatus>("pending");
   const [action, setAction] = useState<{ type: "approve" | "reject"; request: VerificationRequest } | null>(null);
-  const query = useApiQuery(`admin:verification:${status}`, () => api.admin.verificationRequests(status));
+  const [page, setPage] = useState(1);
+  const query = useApiQuery(`admin:verification:${status}:${page}`, () => api.admin.verificationRequests(status, page));
 
   const remove = (id: string) =>
     query.mutate((page) => ({ ...page, count: page.count - 1, results: page.results.filter((r) => r.id !== id) }));
@@ -39,7 +41,10 @@ export function AdminVerification() {
         title="Mentor verification"
         description="Approve mentors before their profiles become visible. Approval is what grants the Verified badge."
       />
-      <Tabs value={status} onValueChange={(v) => setStatus(v as VerificationRequestStatus)}>
+      <Tabs value={status} onValueChange={(v) => {
+          setStatus(v as VerificationRequestStatus);
+          setPage(1);
+        }}>
         <TabsList>
           {TABS.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value} className="px-3">
@@ -124,6 +129,7 @@ export function AdminVerification() {
           )
         }
       </QueryView>
+      <Pager page={page} count={query.data?.count ?? 0} onPageChange={setPage} />
 
       <ConfirmationDialog
         open={action?.type === "approve"}

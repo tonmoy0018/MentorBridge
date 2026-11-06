@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { Heart } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/data/client";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/common/page-header";
+import { Pager } from "@/components/common/pager";
 import { QueryView } from "@/components/common/query-view";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { CardListSkeleton } from "@/components/feedback/loading-state";
@@ -13,7 +15,8 @@ import { SaveMentorButton } from "@/components/mentors/save-mentor-button";
 import { useApiQuery } from "@/hooks/use-api-query";
 
 export function SavedMentors() {
-  const query = useApiQuery("student:saved", () => api.student.savedMentors());
+  const [page, setPage] = useState(1);
+  const query = useApiQuery(`student:saved:${page}`, () => api.student.savedMentors(page));
 
   return (
     <div className="grid grid-cols-1 gap-6">
@@ -63,6 +66,7 @@ export function SavedMentors() {
           )
         }
       </QueryView>
+      <Pager page={page} count={query.data?.count ?? 0} onPageChange={setPage} />
     </div>
   );
 }

@@ -34,9 +34,9 @@ export function SaveMentorButton({
   useEffect(() => {
     if (initialSaved !== undefined) return;
     let cancelled = false;
-    api.student.savedMentors().then(
-      (page) => {
-        if (!cancelled) setSaved(page.results.some((m) => m.id === mentorId || m.slug === mentorId));
+    api.student.isSaved(mentorId).then(
+      (isSaved) => {
+        if (!cancelled) setSaved(isSaved);
       },
       // Signed out or not a student: show the default "Save" state.
       () => {
@@ -60,7 +60,7 @@ export function SaveMentorButton({
     } catch (error) {
       if (isApiError(error) && error.kind === "unauthenticated") {
         router.push(loginRedirectPath(pathname));
-      } else if (isApiError(error) && error.kind === "forbidden") {
+      } else if (isApiError(error) && error.kind === "forbidden" && error.code === "permission_denied") {
         toast.error("Only student accounts can save mentors.");
       } else {
         toast.error("Couldn't update saved mentors", { description: getErrorMessage(error) });
