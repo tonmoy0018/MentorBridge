@@ -1,0 +1,5 @@
+Hi {{ first_name }},
+
+Your payment for {{ service_title }} arrived after the booking was no longer available, so we released the authorisation. You have not been charged.
+
+Find another time: {{ site_url }}/mentors

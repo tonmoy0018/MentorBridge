@@ -1,0 +1,6 @@
+Hi {{ first_name }},
+
+Confirm your email address by opening this link:
+{{ link }}
+
+The link can be used once. If you didn't create a MentorBridge account, you can ignore this email.

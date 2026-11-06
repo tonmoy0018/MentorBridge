@@ -1,0 +1,115 @@
+# Local development stack: PostgreSQL, Django API, booking-expiry scheduler, Mailpit.
+# The Next.js frontend runs natively (`cd frontend && pnpm dev`) and proxies /api/* here.
+# Every value has a development default; override them in a root .env file.
+name: mentorbridge
+
+x-backend-env: &backend-env
+  DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-config.settings.dev}
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-insecure-secret-key-change-me-0123456789abcdef}
+  DJANGO_DEBUG: ${DJANGO_DEBUG:-true}
+  DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
+  DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+  DATABASE_URL: postgres://${POSTGRES_USER:-mentorbridge}:${POSTGRES_PASSWORD:-mentorbridge}@db:5432/${POSTGRES_DB:-mentorbridge}
+  EMAIL_HOST: mailpit
+  EMAIL_PORT: "1025"
+  FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+  PLATFORM_CURRENCY: ${PLATFORM_CURRENCY:-USD}
+  PLATFORM_FEE_BPS: ${PLATFORM_FEE_BPS:-1500}
+  REQUIRE_VERIFIED_EMAIL: ${REQUIRE_VERIFIED_EMAIL:-false}
+  BOOKING_HOLD_MINUTES: ${BOOKING_HOLD_MINUTES:-30}
+  MENTOR_RESPONSE_HOURS: ${MENTOR_RESPONSE_HOURS:-48}
+  FREE_CANCELLATION_HOURS: ${FREE_CANCELLATION_HOURS:-24}
+  PAYMENT_WEBHOOK_GRACE_MINUTES: ${PAYMENT_WEBHOOK_GRACE_MINUTES:-5}
+  # Payments are off unless set (docs/PAYMENTS.md §6). Use provider TEST keys locally.
+  PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-}
+  STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+  STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+
+x-backend: &backend
+  build:
+    context: ./backend
+  image: mentorbridge-backend:dev
+  environment:
+    <<: *backend-env
+  volumes:
+    - ./backend:/app
+  depends_on:
+    db:
+      condition: service_healthy
+
+services:
+  db:
+    image: postgres:17.11
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mentorbridge}
+      POSTGRES_USER: ${POSTGRES_USER:-mentorbridge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mentorbridge}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      # 5433 on the host to avoid clashing with a locally installed PostgreSQL.
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  mailpit:
+    image: axllent/mailpit:v1.32.0
+    ports:
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+
+  backend:
+    <<: *backend
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py createcachetable &&
+             python manage.py runserver 0.0.0.0:8000"
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+
+  scheduler:
+    <<: *backend
+    # Every minute: expire lapsed holds/requests, queue session reminders, retry failed emails.
+    command: >
+      sh -c "while true; do
+               python manage.py expire_bookings || true;
+               python manage.py send_session_reminders || true;
+               python manage.py send_notifications || true;
+               sleep 60;
+             done"
+    depends_on:
+      backend:
+        condition: service_started
+
+  # Browser end-to-end suite (frontend/e2e). Dedicated database `mentorbridge_e2e`, created if
+  # missing and never reset; relaxed rate limits. Started by Playwright: `pnpm test:e2e`.
+  api-e2e:
+    <<: *backend
+    profiles: ["e2e"]
+    environment:
+      <<: *backend-env
+      DJANGO_SETTINGS_MODULE: config.settings.e2e
+      DATABASE_URL: postgres://${POSTGRES_USER:-mentorbridge}:${POSTGRES_PASSWORD:-mentorbridge}@db:5432/mentorbridge_e2e
+      DJANGO_CSRF_TRUSTED_ORIGINS: http://localhost:3200
+      FRONTEND_URL: http://localhost:3200
+      # The browser suite runs with payments off: it never reaches a payment provider.
+      PAYMENT_PROVIDER: ""
+      STRIPE_SECRET_KEY: ""
+      STRIPE_WEBHOOK_SECRET: ""
+      # Test-only account in the test-only database.
+      DJANGO_SUPERUSER_EMAIL: e2e-admin@example.com
+      DJANGO_SUPERUSER_PASSWORD: E2E-Admin-Pass-2026
+    command: >
+      sh -c "python scripts/ensure_database.py &&
+             python manage.py migrate --noinput &&
+             python manage.py createcachetable &&
+             python manage.py ensure_admin &&
+             exec python manage.py runserver 0.0.0.0:8000 --noreload"
+    ports:
+      - "8001:8000"
+
+volumes:
+  pgdata:

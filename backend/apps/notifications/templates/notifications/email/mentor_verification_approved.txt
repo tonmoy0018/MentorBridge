@@ -1,0 +1,5 @@
+Hi {{ first_name }},
+
+Good news: your mentor profile has been reviewed and approved. Students can now find and book you.
+
+View your profile: {{ site_url }}/mentors/{{ slug }}

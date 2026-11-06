@@ -1,0 +1,9 @@
+Hi {{ first_name }},
+
+{{ mentor_name }} couldn't accept your request for {{ service_title }} on {{ when }}.
+{% if reason %}
+Their message: {{ reason }}
+{% endif %}{% if paid %}
+Your card was not charged; the authorisation has been released.
+{% endif %}
+Find another time or mentor: {{ site_url }}/mentors

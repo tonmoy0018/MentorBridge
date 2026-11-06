@@ -1,0 +1,1 @@
+Refund on its way: {{ amount }}

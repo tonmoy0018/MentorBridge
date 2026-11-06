@@ -1,0 +1,12 @@
+Hi {{ first_name }},
+
+Your session is confirmed.
+
+Service: {{ service_title }}
+With: {{ mentor_name }}
+When: {{ when }}
+{% if price %}Price: {{ price }}
+{% endif %}
+The meeting link is in your bookings: {{ site_url }}/dashboard/student/bookings
+
+You can cancel from the same page. {% if paid %}Cancellations at least {{ free_cancellation_hours }} hours before the session are refunded in full.{% endif %}

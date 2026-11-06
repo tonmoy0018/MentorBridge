@@ -1,0 +1,9 @@
+Hi {{ first_name }},
+
+The session {{ service_title }} on {{ when }} has been cancelled by {{ cancelled_by }}.
+{% if reason %}
+Reason: {{ reason }}
+{% endif %}{% if refund_text %}
+{{ refund_text }}
+{% endif %}
+Your bookings: {{ site_url }}/dashboard

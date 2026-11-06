@@ -1,0 +1,9 @@
+Hi {{ first_name }},
+
+This is a reminder of your upcoming session.
+
+Service: {{ service_title }}
+With: {{ other_name }}
+When: {{ when }}
+
+Join from your bookings page: {{ site_url }}/dashboard

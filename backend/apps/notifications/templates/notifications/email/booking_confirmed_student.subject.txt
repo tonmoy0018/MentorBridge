@@ -1,0 +1,1 @@
+Your session with {{ mentor_name }} is confirmed

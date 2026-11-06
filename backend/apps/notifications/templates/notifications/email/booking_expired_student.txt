@@ -1,0 +1,5 @@
+Hi {{ first_name }},
+
+Your request for {{ service_title }} with {{ mentor_name }} on {{ when }} expired before it was confirmed.{% if paid %} You weren't charged.{% endif %}
+
+Find another time: {{ site_url }}/mentors

@@ -1,0 +1,3 @@
+Hi {{ first_name }},
+
+The refund of {{ amount }} for {{ service_title }} couldn't be completed by the payment provider. Our team has been alerted and will contact you.

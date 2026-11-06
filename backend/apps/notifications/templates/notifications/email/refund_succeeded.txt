@@ -1,0 +1,3 @@
+Hi {{ first_name }},
+
+The payment provider has confirmed your refund of {{ amount }} for {{ service_title }}.

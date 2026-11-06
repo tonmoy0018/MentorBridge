@@ -1,0 +1,8 @@
+Hi {{ first_name }},
+
+Your session with {{ student_name }} is confirmed.
+
+Service: {{ service_title }}
+When: {{ when }}
+
+See your upcoming sessions: {{ site_url }}/dashboard/mentor/bookings

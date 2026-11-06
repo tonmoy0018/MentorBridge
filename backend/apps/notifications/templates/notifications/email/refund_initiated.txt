@@ -1,0 +1,5 @@
+Hi {{ first_name }},
+
+We've started a refund of {{ amount }} for {{ service_title }}. Refunds usually reach your card within 5–10 business days, depending on your bank.
+
+We'll email you again when the payment provider confirms it.

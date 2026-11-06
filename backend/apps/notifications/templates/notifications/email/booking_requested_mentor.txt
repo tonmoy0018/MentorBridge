@@ -1,0 +1,11 @@
+Hi {{ first_name }},
+
+{{ student_name }} has requested a session with you.
+
+Service: {{ service_title }}
+When: {{ when }}
+{% if note %}Their note: {{ note }}
+{% endif %}
+Please accept or decline by {{ respond_by }}. If you don't respond, the request expires{% if paid %} and the student's card authorisation is released{% endif %}.
+
+Review the request: {{ site_url }}/dashboard/mentor/bookings

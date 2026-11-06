@@ -1,0 +1,8 @@
+Hi {{ first_name }},
+
+Our team reviewed your mentor profile and needs a few changes before it can be published.
+
+Reviewer feedback:
+{{ reason }}
+
+Update your profile and submit it again: {{ site_url }}/dashboard/mentor/profile
