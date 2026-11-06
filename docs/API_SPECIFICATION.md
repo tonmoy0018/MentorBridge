@@ -69,6 +69,7 @@ A resource that exists but isn't yours returns **404, not 403**, so IDs can't be
 | 409 | `invalid_state` | Transition not allowed from the current status |
 | 409 | `service_unavailable` / `not_accepting_bookings` | Service hidden / mentor paused bookings |
 | 409 | `payment_required` | Mentor accepts a paid request that has no authorised payment |
+| 409 | `too_many_pending` | The student already has 5 unconfirmed bookings (held for payment or awaiting a mentor), or 2 with this mentor |
 | 409 | `hold_expired` / `already_paid` | Checkout for a booking whose hold lapsed / that is already paid |
 | 409 | `not_refundable` / `refund_too_large` | Refunding an uncaptured payment / more than is still refundable |
 | 409 | `already_exists` | Duplicate review, pending verification, open report |
@@ -93,7 +94,7 @@ A resource that exists but isn't yours returns **404, not 403**, so IDs can't be
 | `review_create`, `report_create` | 20/hour, 10/hour | reviews, reports |
 | `anon` / `user` | 120/min / 600/min | everything else |
 
-The client IP comes from `X-Forwarded-For`, trusting `NUM_PROXIES` proxies (default 1, for the Next.js proxy).
+The client IP comes from `X-Forwarded-For`, trusting `NUM_PROXIES` proxies (default 1). In production that's Caddy, which overwrites client-supplied values; Next.js forwards the visitor's header on server-side calls. The per-account login limit folds case and look-alike characters (`ſ`, `ı`) the way the account lookup does. The Django admin login is limited separately: 10 failures per IP and 5 per account per 15 minutes.
 
 ---
 
@@ -271,7 +272,7 @@ Before capture, cancelling releases the card authorisation. A `full_refund` on a
 | POST | `/admin/bookings/{id}/cancel/` | `{reason, refund=true}`. Cancels any active booking; releases an authorisation, or refunds a captured payment in full if `refund`. Emails both parties. 409 for closed bookings. Audit-logged |
 | GET | `/admin/payments/`, `/admin/payments/{id}/` | `?status=&livemode=`. `{amount, commission_bps, platform_fee, mentor_share, provider_fee, refunded, refundable, status, refund_status, dispute_status, provider, provider_reference, livemode, failure_code, …}`. Payment status can't be set through any API |
 | POST | `/admin/payments/{id}/refund/` | `{amount_cents?, note}` → 201 refund. Omit `amount_cents` for everything still refundable. 409 `not_refundable` (not captured) / `refund_too_large`. Audit-logged |
-| GET | `/admin/refunds/` | `{amount, commission_reversed, mentor_share_reversed, reason, status: pending\|succeeded\|failed, provider_reference, failure_code, note, initiated_by_name, …}` |
+| GET | `/admin/refunds/` | `{amount, commission_reversed, mentor_share_reversed, reason: student_cancellation\|mentor_cancellation\|admin\|dispute_lost\|system, status: pending\|succeeded\|failed, provider_reference, failure_code, note, initiated_by_name, …}` |
 | GET | `/admin/reviews/` | `?status=published\|hidden&mentor=<slug>` |
 | POST | `/admin/reviews/{id}/hide/` | `{reason}` (required). Recalculates the mentor's rating. Audit-logged |
 | POST | `/admin/reviews/{id}/publish/` | Restores a hidden review. Audit-logged |

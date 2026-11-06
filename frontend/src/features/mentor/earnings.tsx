@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { Banknote, Clock, Landmark, TrendingUp } from "lucide-react";
 import type { LedgerKind, PayoutStatus } from "@/lib/api/types";
 import { api } from "@/lib/data/client";
 import { formatDate, formatMoney } from "@/lib/format";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader, SectionHeading } from "@/components/common/page-header";
+import { Pager } from "@/components/common/pager";
 import { QueryView } from "@/components/common/query-view";
 import { StatCard } from "@/components/common/stat-card";
 import { StatusBadge, type Tone } from "@/components/common/status-badge";
@@ -32,8 +34,10 @@ const money = (m: Parameters<typeof formatMoney>[0]) => formatMoney(m, { showFre
 export function Earnings() {
   const { user } = useCurrentUser();
   const summary = useApiQuery("mentor:earnings", () => api.mentor.earningsSummary());
-  const ledger = useApiQuery("mentor:ledger", () => api.mentor.ledger());
-  const payouts = useApiQuery("mentor:payouts", () => api.mentor.payouts());
+  const [ledgerPage, setLedgerPage] = useState(1);
+  const [payoutPage, setPayoutPage] = useState(1);
+  const ledger = useApiQuery(`mentor:ledger:${ledgerPage}`, () => api.mentor.ledger(ledgerPage));
+  const payouts = useApiQuery(`mentor:payouts:${payoutPage}`, () => api.mentor.payouts(payoutPage));
   const profile = useApiQuery("mentor:profile", () => api.mentor.profile());
   const rate =
     profile.status === "success" ? `${(profile.data.commission_bps / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}%` : null;
@@ -96,6 +100,7 @@ export function Earnings() {
             )
           }
         </QueryView>
+        <Pager page={ledgerPage} count={ledger.data?.count ?? 0} onPageChange={setLedgerPage} />
       </section>
 
       <section aria-labelledby="payouts-heading" className="grid grid-cols-1 gap-4">
@@ -140,6 +145,7 @@ export function Earnings() {
             )
           }
         </QueryView>
+        <Pager page={payoutPage} count={payouts.data?.count ?? 0} onPageChange={setPayoutPage} />
       </section>
     </div>
   );

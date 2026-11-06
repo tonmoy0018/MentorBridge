@@ -139,6 +139,7 @@ class RefundReason(models.TextChoices):
     MENTOR_CANCELLATION = "mentor_cancellation", "Mentor cancelled"
     ADMIN = "admin", "Issued by an administrator"
     DISPUTE_LOST = "dispute_lost", "Dispute lost"
+    SYSTEM = "system", "Automatic: the booking couldn't go ahead"
 
 
 class RefundRecordStatus(models.TextChoices):

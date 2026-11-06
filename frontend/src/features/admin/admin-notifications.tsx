@@ -14,7 +14,7 @@ import { EmptyState } from "@/components/feedback/empty-state";
 import { NativeSelect } from "@/components/forms/native-select";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { AdminSecurityNote } from "./admin-note";
-import { Pager } from "./pager";
+import { Pager } from "@/components/common/pager";
 
 const STATUS: Record<NotificationStatus, { label: string; tone: Tone }> = {
   queued: { label: "Queued", tone: "info" },

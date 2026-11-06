@@ -173,6 +173,57 @@ See [PAYMENTS.md](PAYMENTS.md).
 - [x] Booking emails (payments stage); in-app notifications still open
 - [ ] E2E isn't wired into CI yet (M7)
 
+## PRR — Production-readiness review (2026-11-06)
+
+Independent backend and frontend reviews plus a local rehearsal of the production stack ([DEPLOYMENT.md](DEPLOYMENT.md)).
+
+### Fixed (with regression tests)
+- [x] **Search DoS:** each search term added JOIN pairs, so 4 terms cost ~1e11× one term. It now uses subqueries, and production has a 30 s `statement_timeout`.
+- [x] **Server-rendered pages broken in production:** Django's HTTPS redirect hit Next.js's internal HTTP calls. Next.js now forwards `X-Forwarded-Proto/Host/For`.
+- [x] **SSR traffic shared one rate-limit bucket:** all anonymous page views counted against the Next.js server's IP. Fixed by the same header forwarding.
+- [x] **Stranded captures:** money captured while the booking stayed `requested` or closed. A capture now confirms the booking, or refunds it automatically if the booking closed; a retried accept is idempotent.
+- [x] **Django admin login** had no throttling (now 10 failures per IP and 5 per account per 15 min).
+- [x] **Profile saves overwrote admin decisions** (verification status, rating, commission). Saves now write only the changed fields.
+- [x] **Per-account login limit bypass** with look-alike emails (`ſ`, `ı`).
+- [x] **Calendar blocking:** one student could hold unlimited slots. Now capped at 5 pending bookings per student and 2 per mentor.
+- [x] **Smaller backend fixes:**
+  - decompression-bomb avatar → 500;
+  - reactivation revived old sessions;
+  - registration race → 500;
+  - HTML-escaped email subjects;
+  - reviews editable or deletable in Django admin without a rating recalculation;
+  - lost dispute plus pending refund broke the refund constraint.
+- [x] **Open redirect after login** via dot-segments (`/.//evil.example`).
+- [x] **Bookings board** dropped the newest bookings past 50. Admin lists (including the verification queue), saved mentors and earnings were cut at 20. All are paginated now.
+- [x] **Frontend fixes:**
+  - dashboard and global error boundaries;
+  - production Content-Security-Policy, with E2E checks for no console errors;
+  - 403 messages no longer blame the role for CSRF failures;
+  - the checkout notice no longer promises updates it doesn't deliver, and handles session expiry;
+  - Back from the provider no longer leaves a stuck button.
+- [x] **Dependencies:** the `shadcn` CLI moved to devDependencies. `pnpm audit --prod` went from 2 advisories (1 moderate, 1 low) to 0.
+- [x] **Production configuration** (`deploy/`, frontend Dockerfile):
+  - `prod.py` refuses unsafe or misconfigured settings;
+  - static and media are served;
+  - access logs record the client IP;
+  - backup and restore were tested.
+
+### Known, not fixed (accepted for MVP or needing a decision)
+- [ ] Mentors can change their **name** after approval without re-review or audit.
+- [ ] Registration reveals whether an email is registered (login and reset don't).
+- [ ] Suspending a mentor doesn't cancel their upcoming bookings; an admin must cancel them (Admin → Bookings).
+- [ ] Mentors can mark a session completed as soon as it starts, which makes earnings "available" early. There's no no-show process for students.
+- [ ] `available_within_days` search is CPU-heavy: slot generation for up to 500 mentors, in Python.
+- [ ] **Frontend:**
+  - a few texts hard-code the 24 h cancellation window;
+  - an out-of-range directory page shows an error, not the empty state;
+  - signed-in visitors to `/login?next=` lose `next`;
+  - tall sticky sidebars on short screens;
+  - login/signup buttons re-enable before navigation;
+  - the directory makes 6 API calls per view (taxonomy isn't cached).
+- [ ] Development-only: IP rate limits can be spoofed through the dev proxy. Production overwrites the header at Caddy.
+- [ ] Media on a local volume: single host only. Use object storage before scaling out.
+
 ## M7 — Hardening & launch readiness
 - [ ] GitHub Actions CI: lint, typecheck, backend tests (Postgres service), frontend tests, Playwright, `pip-audit`, `pnpm audit`, OpenAPI type drift check
 - [ ] Security review (OWASP ASVS L1 checklist), CSP, HSTS, cookie flags verified in prod config
@@ -201,7 +252,8 @@ See [PAYMENTS.md](PAYMENTS.md).
 | Tax treatment of commission and session fees | M4 / launch | Product owner + accountant |
 | Email provider choice | M5 (prod), M7 | Product owner |
 | Launch geography/currency | M4 | Product owner |
-| Hosting platform | M7 | Product owner / engineering |
+| Hosting platform + domain + SMTP provider | M7 | Product owner / engineering |
+| **Privacy policy and terms of service** (none exist; payment providers require them) | Launch | Product owner + legal |
 | Mentor verification evidence policy | M2 | Product owner |
 | Local Python 3.13 (optional, for IDE tooling; backend runs in Docker) | — | Developer |
 
@@ -213,3 +265,4 @@ See [PAYMENTS.md](PAYMENTS.md).
 | 2026-10-27 | BE | Django/DRF/PostgreSQL backend matching the frontend contract. Integration run found and fixed a 500 on `GET /categories/` (counts not requested) and added a regression test. A throwaway `mentorbridge_integration` database was created for the live run and dropped afterwards; the dev database holds no test data. | `pytest` 143/143 ✅ (PostgreSQL) · `ruff check` ✅ · `ruff format --check` ✅ · `makemigrations --check` ✅ · `spectacular --validate --fail-on-warn` ✅ · frontend `typecheck` ✅ + `vitest` 57/57 ✅ · live browser flow (signup → profile → service → hours → verification → admin approve → student booking → mentor accept → confirmed + meeting link → logout) ✅ |
 | 2026-10-27 | INT | Web app integrated with the API; mock layer removed; contract check added. Live E2E found 3 real bugs, all fixed with regression tests. | backend `pytest` 150/150 ✅ · `ruff` ✅ · `makemigrations --check` ✅ · OpenAPI `--fail-on-warn` ✅ · frontend `lint` ✅ · `typecheck` + contract check ✅ · `vitest` 66/66 ✅ · `playwright` 35/35 ✅ against the real stack, twice in a row |
 | 2026-11-06 | M4/M5/M6 | Payments (provider abstraction + Stripe adapter, webhooks, commission, refunds, disputes), transactional email and admin operations. **Live payments and payouts are not operational: no provider chosen, no real provider account used.** Found and fixed: late authorisations on an already-cancelled checkout stayed held; reset/verification links persisted in the email table; email links were HTML-escaped; `AdminStats` schema dropped the `test` block; `Refund.status` documented with the wrong enum; compose didn't pass payment settings. | backend `pytest` 307 passed, 2 skipped (stripe-mock tests, run separately: 2/2 ✅ against `stripe/stripe-mock:v0.206.0`) ✅ · `ruff` ✅ · `makemigrations --check` ✅ · OpenAPI `--fail-on-warn` ✅ · mutation check: bypassing signature verification or the late-payment fix fails tests ✅ · frontend `lint` ✅ · `typecheck` + contract check ✅ · `vitest` 79/79 ✅ · `playwright` 35/35 ✅ (payments disabled) |
+| 2026-11-06 | PRR | Production-readiness review: independent backend and frontend audits, fixes for all high and medium findings (see PRR), production configuration in `deploy/` rehearsed locally over HTTPS (images, prod settings, migrations, smoke tests, avatar upload, backup and restore). **Not deployed publicly.** | backend `pytest` 327 passed, 2 skipped (stripe-mock 2/2 ✅ separately) ✅ · `ruff` ✅ · `makemigrations --check` ✅ · OpenAPI `--fail-on-warn` ✅ · `check --deploy` (prod settings, in the prod image): only the opt-in HSTS preload warning · mutation check: the old search query fails the new cost test ✅ · frontend `lint` ✅ · `typecheck` + contract ✅ · `vitest` 85/85 ✅ · `playwright` 37/37 ✅ (incl. no console errors under CSP) · `pnpm audit --prod`: 0 known vulnerabilities · production Docker images build ✅ |

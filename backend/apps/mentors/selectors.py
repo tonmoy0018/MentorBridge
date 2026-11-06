@@ -62,6 +62,8 @@ def search_mentors(params: dict) -> QuerySet[MentorProfile]:
     qs = public_mentors()
     if q := params.get("q"):
         for term in q.split()[:8]:
+            # Many-to-many matches use subqueries: filtering them through JOINs would add a
+            # pair of joins per term and multiply rows (skills × categories)^terms.
             qs = qs.filter(
                 Q(user__first_name__icontains=term)
                 | Q(user__last_name__icontains=term)
@@ -69,8 +71,8 @@ def search_mentors(params: dict) -> QuerySet[MentorProfile]:
                 | Q(current_title__icontains=term)
                 | Q(current_company__icontains=term)
                 | Q(profession__name__icontains=term)
-                | Q(skills__name__icontains=term)
-                | Q(categories__name__icontains=term)
+                | Q(pk__in=MentorProfile.objects.filter(skills__name__icontains=term).values("pk"))
+                | Q(pk__in=MentorProfile.objects.filter(categories__name__icontains=term).values("pk"))
             )
     if industries := params.get("industry"):
         qs = qs.filter(categories__slug__in=industries)

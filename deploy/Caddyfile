@@ -1,0 +1,38 @@
+# Reverse proxy and TLS for production (docs/DEPLOYMENT.md).
+# Caddy obtains and renews HTTPS certificates automatically and redirects HTTP to HTTPS.
+# It is the only service exposed to the internet; it overwrites any client-supplied
+# X-Forwarded-* headers, which Django and Next.js rely on.
+{
+	email {$ACME_EMAIL}
+}
+
+{$SITE_DOMAIN} {
+	encode zstd gzip
+	header ?Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	header -Server
+
+	# Django: the API (incl. payment webhooks) and Django admin go straight to gunicorn.
+	@django path /api/* /{$DJANGO_ADMIN_URL}*
+	handle @django {
+		reverse_proxy backend:8000
+	}
+
+	# Django admin's static files (collected by `manage.py collectstatic`).
+	handle_path /static/* {
+		root * /srv/static
+		file_server
+	}
+
+	# Uploaded media (mentor avatars). Served inert: no sniffing, no scripts.
+	handle_path /media/* {
+		root * /srv/media
+		header X-Content-Type-Options nosniff
+		header Content-Security-Policy "default-src 'none'; img-src 'self'; sandbox"
+		file_server
+	}
+
+	# Everything else is the Next.js app.
+	handle {
+		reverse_proxy frontend:3000
+	}
+}

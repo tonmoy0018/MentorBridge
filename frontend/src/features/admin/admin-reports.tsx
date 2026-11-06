@@ -9,6 +9,7 @@ import { formatDateTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/common/page-header";
+import { Pager } from "@/components/common/pager";
 import { QueryView } from "@/components/common/query-view";
 import { StatusBadge, type Tone } from "@/components/common/status-badge";
 import { useCurrentUser } from "@/components/dashboard/current-user";
@@ -38,12 +39,18 @@ export function AdminReports() {
   const [tab, setTab] = useState<"open" | "resolved">("open");
   const [resolving, setResolving] = useState<{ report: ContentReport; resolution: "actioned" | "dismissed" } | null>(null);
   const [hideReview, setHideReview] = useState(true);
-  const query = useApiQuery(`admin:reports:${tab}`, () => api.admin.reports(tab === "open" ? "open" : "resolved"));
+  const [page, setPage] = useState(1);
+  const query = useApiQuery(`admin:reports:${tab}:${page}`, () =>
+    api.admin.reports(tab === "open" ? "open" : "resolved", page),
+  );
 
   return (
     <div className="grid grid-cols-1 gap-6">
       <PageHeader title="Reported content" description="Reports from students and mentors about reviews, profiles and bookings." />
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "open" | "resolved")}>
+      <Tabs value={tab} onValueChange={(v) => {
+          setTab(v as "open" | "resolved");
+          setPage(1);
+        }}>
         <TabsList>
           <TabsTrigger value="open" className="px-3">
             Needs review
@@ -91,6 +98,7 @@ export function AdminReports() {
           )
         }
       </QueryView>
+      <Pager page={page} count={query.data?.count ?? 0} onPageChange={setPage} />
       <ConfirmationDialog
         open={resolving !== null}
         onOpenChange={(o) => {

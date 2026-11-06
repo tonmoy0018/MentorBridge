@@ -1,11 +1,13 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { isApiError } from "@/lib/api/errors";
 import type { Booking } from "@/lib/api/types";
 import { api } from "@/lib/data/client";
 import { formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { loginRedirectPath } from "@/hooks/use-api-error-handler";
 
 const POLL_MS = 2_000;
 const MAX_POLLS = 15;
@@ -19,6 +21,8 @@ type State = { phase: "checking" } | { phase: "done"; booking: Booking } | { pha
  */
 export function CheckoutReturnNotice({ onSettled, timeZone }: { onSettled: () => void; timeZone?: string }) {
   const params = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const bookingId = params.get("checkout");
   const cancelled = params.get("cancelled") === "1";
   const [state, setState] = useState<State>({ phase: "checking" });
@@ -34,7 +38,11 @@ export function CheckoutReturnNotice({ onSettled, timeZone }: { onSettled: () =>
       let booking: Booking | undefined;
       try {
         booking = await api.bookings.get(bookingId);
-      } catch {
+      } catch (error) {
+        if (isApiError(error) && error.kind === "unauthenticated") {
+          router.replace(loginRedirectPath(`${pathname}?${params.toString()}`, "expired"));
+          return;
+        }
         booking = undefined;
       }
       if (stopped) return;
@@ -102,6 +110,6 @@ function describe(state: State, cancelled: boolean, timeZone?: string): { tone: 
   }
   return {
     tone: "warning",
-    text: `We haven't received confirmation from the payment provider yet.${heldUntil} Nothing is marked as paid until the provider confirms; this page updates when it does, or refresh in a minute.`,
+    text: `We haven't received confirmation from the payment provider yet.${heldUntil} Nothing is marked as paid until the provider confirms. Refresh this page in a minute to check again.`,
   };
 }

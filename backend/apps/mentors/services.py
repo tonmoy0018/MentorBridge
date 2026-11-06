@@ -53,7 +53,9 @@ def update_profile(mentor: MentorProfile, data: dict, *, actor, request=None) ->
     changed_public = sorted(f for f in PUBLIC_FIELDS if f in data and getattr(mentor, f) != data[f])
     for field, value in data.items():
         setattr(mentor, field, value)
-    mentor.save()
+    # Only the submitted columns: a full save would write back stale copies of fields that
+    # admins and other services change concurrently (verification status, rating, commission).
+    mentor.save(update_fields=[*data.keys(), "updated_at"])
 
     if categories is not None:
         mentor.categories.set(categories)
@@ -246,7 +248,7 @@ def set_avatar(mentor: MentorProfile, upload) -> MentorProfile:
             image.verify()
             fmt = image.format
             width, height = image.size
-    except (UnidentifiedImageError, OSError) as exc:
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as exc:
         raise ValidationError({"avatar": "Upload a JPEG, PNG or WebP image."}) from exc
     if fmt not in AVATAR_FORMATS:
         raise ValidationError({"avatar": "Upload a JPEG, PNG or WebP image."})
@@ -254,7 +256,8 @@ def set_avatar(mentor: MentorProfile, upload) -> MentorProfile:
         raise ValidationError({"avatar": "Use an image no larger than 4000×4000 pixels."})
     upload.seek(0)
     old = mentor.avatar.name if mentor.avatar else None
-    mentor.avatar.save(f"avatar.{AVATAR_FORMATS[fmt]}", upload, save=True)
+    mentor.avatar.save(f"avatar.{AVATAR_FORMATS[fmt]}", upload, save=False)
+    mentor.save(update_fields=["avatar", "updated_at"])
     if old:
         mentor.avatar.storage.delete(old)
     return mentor
@@ -262,5 +265,6 @@ def set_avatar(mentor: MentorProfile, upload) -> MentorProfile:
 
 def clear_avatar(mentor: MentorProfile) -> MentorProfile:
     if mentor.avatar:
-        mentor.avatar.delete(save=True)
+        mentor.avatar.delete(save=False)
+        mentor.save(update_fields=["avatar", "updated_at"])
     return mentor

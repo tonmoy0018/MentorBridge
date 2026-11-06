@@ -6399,12 +6399,14 @@ components:
       - mentor_cancellation
       - admin
       - dispute_lost
+      - system
       type: string
       description: |-
         * `student_cancellation` - Student cancelled
         * `mentor_cancellation` - Mentor cancelled
         * `admin` - Issued by an administrator
         * `dispute_lost` - Dispute lost
+        * `system` - Automatic: the booking couldn't go ahead
     RefundRecordStatusEnum:
       enum:
       - pending

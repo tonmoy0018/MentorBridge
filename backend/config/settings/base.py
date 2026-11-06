@@ -228,6 +228,10 @@ PLATFORM_FEE_BPS = env.int("PLATFORM_FEE_BPS", default=1500)  # 15.00%
 BOOKING_HOLD_MINUTES = env.int("BOOKING_HOLD_MINUTES", default=30)
 CHECKOUT_MIN_MINUTES = 31
 PAYMENT_WEBHOOK_GRACE_MINUTES = env.int("PAYMENT_WEBHOOK_GRACE_MINUTES", default=5)
+# Unconfirmed bookings (held for payment or awaiting the mentor) a student may have at once,
+# so one account can't block mentors' calendars.
+MAX_PENDING_BOOKINGS_PER_STUDENT = env.int("MAX_PENDING_BOOKINGS_PER_STUDENT", default=5)
+MAX_PENDING_BOOKINGS_PER_MENTOR_PAIR = env.int("MAX_PENDING_BOOKINGS_PER_MENTOR_PAIR", default=2)
 # Card authorisations last about 7 days, so mentors must respond well within that.
 MENTOR_RESPONSE_HOURS = env.int("MENTOR_RESPONSE_HOURS", default=48)
 if not 1 <= MENTOR_RESPONSE_HOURS <= 120:

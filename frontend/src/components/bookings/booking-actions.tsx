@@ -7,6 +7,7 @@ import { getErrorMessage, isApiError } from "@/lib/api/errors";
 import type { Booking, BookingStatus } from "@/lib/api/types";
 import { goToCheckout } from "@/lib/checkout";
 import { api } from "@/lib/data/client";
+import { useReloadOnBack } from "@/hooks/use-reload-on-back";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Dialog as DialogRoot, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -62,6 +63,7 @@ export function BookingActions({
 }) {
   const [dialog, setDialog] = useState<Dialog>(null);
   const [opening, setOpening] = useState(false);
+  useReloadOnBack();
   const isMentor = perspective === "mentor";
   const { canAccept, canComplete, canCancel, canReview, canPay, any } = bookingPermissions(booking, perspective);
 

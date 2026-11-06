@@ -24,6 +24,20 @@ test.describe("public pages (live API)", () => {
     await expect(page.getByRole("link", { name: "Clear all" })).toBeVisible();
   });
 
+  test("public pages load without console errors (incl. CSP violations) and send a CSP", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text());
+    });
+    page.on("pageerror", (error) => errors.push(error.message));
+    for (const path of ["/", "/mentors", "/login", "/signup", "/forgot-password"]) {
+      const response = await page.goto(path);
+      expect(response?.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
+      await page.waitForLoadState("networkidle");
+    }
+    expect(errors).toEqual([]);
+  });
+
   test("searching for nothing shows the empty state", async ({ page }) => {
     await page.goto("/mentors?q=zzzz-no-such-mentor");
     await expect(page.getByRole("heading", { name: "No mentors match your search" })).toBeVisible();

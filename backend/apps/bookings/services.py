@@ -92,6 +92,7 @@ def create_booking(*, student, service_id, start_at: datetime, student_note: str
         # Serialise bookings for this mentor; concurrent requests wait here.
         MentorProfile.objects.select_for_update().get(pk=mentor.pk)
         expire_due(now=now, mentor=mentor, student=student)
+        _check_pending_limits(student, mentor)
 
         slots = bookable_slots(
             mentor,
@@ -144,6 +145,23 @@ def create_booking(*, student, service_id, start_at: datetime, student_note: str
             notifications.confirmed(booking)
     logger.info("Booking %s created (%s) for mentor %s", booking.pk, status, mentor.pk)
     return booking
+
+
+def _check_pending_limits(student, mentor) -> None:
+    pending = Booking.objects.filter(
+        student=student, status__in=[BookingStatus.PENDING_PAYMENT, BookingStatus.REQUESTED]
+    )
+    if pending.count() >= settings.MAX_PENDING_BOOKINGS_PER_STUDENT:
+        raise Conflict(
+            "too_many_pending",
+            "You have too many bookings waiting for payment or a mentor's answer. "
+            "Complete or cancel some before booking more.",
+        )
+    if pending.filter(mentor=mentor).count() >= settings.MAX_PENDING_BOOKINGS_PER_MENTOR_PAIR:
+        raise Conflict(
+            "too_many_pending",
+            "You already have bookings with this mentor waiting for payment or an answer.",
+        )
 
 
 # --- mentor actions ---------------------------------------------------------------------
@@ -217,6 +235,26 @@ def payment_authorized(booking: Booking, payment) -> Booking:
     return booking
 
 
+def confirm_after_capture(booking: Booking) -> Booking:
+    """
+    The provider reports a capture for a request we still show as `requested` (our accept
+    transaction was lost after the capture succeeded). The mentor accepted, so confirm it.
+    """
+    booking = _lock(booking)
+    if booking.status != BookingStatus.REQUESTED:
+        return booking
+    booking = _transition(
+        booking,
+        BookingStatus.CONFIRMED,
+        note="Confirmed from the provider's capture.",
+        confirmed_at=timezone.now(),
+        respond_by=None,
+        meeting_url=booking.mentor.meeting_url,
+    )
+    notifications.confirmed(booking)
+    return booking
+
+
 @transaction.atomic
 def decline_booking(booking: Booking, *, actor, reason: str) -> Booking:
     booking = _lock(booking)
@@ -232,9 +270,10 @@ def decline_booking(booking: Booking, *, actor, reason: str) -> Booking:
         cancellation_reason=reason.strip(),
         refund_outcome=RefundOutcome.NOT_CHARGED if booking.price_cents else RefundOutcome.NOT_APPLICABLE,
     )
-    from apps.payments.services import release_for_booking
+    from apps.payments.services import refund_stranded_capture, release_for_booking
 
     release_for_booking(booking, reason="declined")
+    refund_stranded_capture(booking)
     notifications.declined(booking)
     return booking
 
@@ -343,9 +382,10 @@ def expire_booking(booking: Booking, *, note: str) -> Booking | None:
         return None
     was_request = booking.status == BookingStatus.REQUESTED
     booking = _transition(booking, BookingStatus.EXPIRED, note=note)
-    from apps.payments.services import release_for_booking
+    from apps.payments.services import refund_stranded_capture, release_for_booking
 
     release_for_booking(booking, reason="expired")
+    refund_stranded_capture(booking)
     if was_request:
         notifications.expired(booking)
     return booking

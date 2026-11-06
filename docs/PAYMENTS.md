@@ -105,6 +105,9 @@ created ──► authorized ──► captured
 | Mentor declines, request expires, or student cancels before acceptance | `declined` / `expired` / `cancelled` | authorisation released → `cancelled` |
 | Authorisation lapses (~7 days) or is cancelled at the provider | `expired` if still pending/requested | `cancelled` |
 | Cancellation after capture | `cancelled` | refund per policy (§7) |
+| Provider reports a capture we didn't record (our accept transaction was lost after the capture succeeded) | `requested` → `confirmed` | `captured` |
+| Same, but the booking already closed (declined/expired/cancelled) | unchanged | `captured`, then refunded in full automatically (reason `system`) |
+| Mentor retries accept after such a capture | `confirmed` | already `captured`: treated as success |
 
 ## 4. Commission and accounting
 
@@ -197,6 +200,8 @@ Secrets come only from the environment (`.env`, git-ignored, or the host's secre
 
 - **Admin refunds.** `POST /admin/payments/{id}/refund/` takes `amount_cents` (optional; omit for everything still refundable) and a required `note`. Pending and succeeded refunds count against the refundable amount, so over-refunding returns 409 `refund_too_large`.
 - **Refunds made in the provider dashboard** arrive as webhooks and are recorded too.
+- **Automatic refunds** (reason `system`) cover money captured for a booking that can't go ahead (§3).
+- A lost dispute only reverses money not already being refunded, so totals can never exceed the payment.
 
 ## 8. Payouts
 

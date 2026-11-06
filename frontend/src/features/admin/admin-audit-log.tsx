@@ -12,7 +12,7 @@ import { useCurrentUser } from "@/components/dashboard/current-user";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { AdminSecurityNote } from "./admin-note";
-import { Pager } from "./pager";
+import { Pager } from "@/components/common/pager";
 
 export function AdminAuditLog() {
   const { user } = useCurrentUser();

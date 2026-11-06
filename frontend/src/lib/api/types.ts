@@ -1,7 +1,7 @@
 /**
- * Typed data models shared by the UI, the live API client and the mock data layer.
- * Mirrors docs/API_SPECIFICATION.md. Once the Django API exists these are replaced by
- * types generated from its OpenAPI schema (`pnpm gen:api`).
+ * Typed data models used by the UI and the API client. Mirrors docs/API_SPECIFICATION.md;
+ * `contract-check.ts` verifies them against the types generated from the backend's OpenAPI
+ * schema (`pnpm gen:api`), so drift fails the typecheck.
  */
 
 import type { components } from "./generated";
@@ -492,7 +492,7 @@ export interface PaymentRecord {
 }
 
 export type RefundRecordStatus = "pending" | "succeeded" | "failed";
-export type RefundReason = "student_cancellation" | "mentor_cancellation" | "admin" | "dispute_lost";
+export type RefundReason = "student_cancellation" | "mentor_cancellation" | "admin" | "dispute_lost" | "system";
 
 export interface RefundRecord {
   id: string;
