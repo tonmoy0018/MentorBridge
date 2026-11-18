@@ -19,10 +19,14 @@ from apps.users.models import Role
 from . import services
 from .models import ACTIVE_STATUSES, Booking, BookingStatus
 from .serializers import (
+    AcceptBookingSerializer,
     BookingDetailSerializer,
     BookingListQuerySerializer,
     BookingSerializer,
     CreateBookingSerializer,
+    MeetingLinkSerializer,
+    MeetingPlaceRevealSerializer,
+    MeetingPlaceSerializer,
 )
 
 TAG = ["Bookings"]
@@ -30,9 +34,10 @@ TAG = ["Bookings"]
 
 def bookings_for(user):
     """Bookings the user takes part in. Anything else is invisible (404), not forbidden."""
-    base = Booking.objects.select_related("mentor__user", "student", "review")
+    base = Booking.objects.select_related("mentor__user", "student", "review", "package_purchase", "seminar")
     if user.role == Role.MENTOR:
-        return base.filter(mentor__user=user)
+        # Seminar seats are managed per seminar (attendee list), not as individual bookings.
+        return base.filter(mentor__user=user, seminar__isnull=True)
     return base.filter(student=user)
 
 
@@ -88,7 +93,9 @@ class BookingListCreateView(generics.GenericAPIView):
             "re-validated inside a transaction; overlapping bookings are rejected by the database.\n\n"
             "* Free services → `requested` (or `confirmed` if the mentor auto-accepts).\n"
             "* Paid services → `pending_payment`, held for `BOOKING_HOLD_MINUTES`. It only advances when "
-            "the payment provider confirms payment server-side (not yet available: holds expire)."
+            "the payment provider confirms payment server-side (not yet available: holds expire).\n"
+            "* `format=in_person` adds the service's in-person extra to the price.\n"
+            "* `package_purchase_id` → paid by the package (price 0), in the package's format."
         ),
         request=CreateBookingSerializer,
         responses={201: BookingDetailSerializer, **errors(E400, AUTHED, E404, E409, E429)},
@@ -102,6 +109,8 @@ class BookingListCreateView(generics.GenericAPIView):
             service_id=data["service_id"],
             start_at=data["start_at"],
             student_note=data["student_note"],
+            session_format=data.get("format"),
+            package_purchase_id=data.get("package_purchase_id"),
         )
         return Response(
             BookingDetailSerializer(booking, context={"request": request}).data,
@@ -160,11 +169,61 @@ class BookingAcceptView(_BookingActionView):
     @extend_schema(
         tags=TAG,
         summary="Accept a booking request (mentor)",
-        request=None,
-        responses={200: BookingDetailSerializer, **errors(AUTHED, E404, E409)},
+        request=AcceptBookingSerializer,
+        responses={200: BookingDetailSerializer, **errors(E400, AUTHED, E404, E409)},
     )
     def post(self, request, pk):
-        return self.respond(request, services.accept_booking(self.booking(request, pk), actor=request.user))
+        serializer = AcceptBookingSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        booking = services.accept_booking(
+            self.booking(request, pk),
+            actor=request.user,
+            meeting_place=serializer.validated_data.get("meeting_place", ""),
+            meeting_url=serializer.validated_data.get("meeting_url", ""),
+        )
+        return self.respond(request, booking)
+
+
+class BookingMeetingLinkView(_BookingActionView):
+    permission_classes = [IsMentor]
+
+    @extend_schema(
+        tags=TAG,
+        summary="Set the call link for an online session (mentor)",
+        description="Use any video tool you and the student agree on. Shown to the student once confirmed.",
+        request=MeetingLinkSerializer,
+        responses={200: BookingDetailSerializer, **errors(E400, AUTHED, E404, E409)},
+    )
+    def post(self, request, pk):
+        serializer = MeetingLinkSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        booking = services.set_meeting_link(
+            self.booking(request, pk),
+            actor=request.user,
+            meeting_url=serializer.validated_data["meeting_url"],
+        )
+        return self.respond(request, booking)
+
+
+class BookingMeetingPlaceView(_BookingActionView):
+    permission_classes = [IsMentor]
+
+    @extend_schema(
+        tags=TAG,
+        summary="Set where to meet for an in-person session (mentor)",
+        description="Shown to the student once the session is confirmed. Never included in emails.",
+        request=MeetingPlaceSerializer,
+        responses={200: BookingDetailSerializer, **errors(E400, AUTHED, E404, E409)},
+    )
+    def post(self, request, pk):
+        serializer = MeetingPlaceSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        booking = services.set_meeting_place(
+            self.booking(request, pk),
+            actor=request.user,
+            meeting_place=serializer.validated_data["meeting_place"],
+        )
+        return self.respond(request, booking)
 
 
 class BookingDeclineView(_BookingActionView):
@@ -243,7 +302,9 @@ class AdminBookingListView(generics.ListAPIView):
     pagination_class = LargePagination
 
     def get_queryset(self):
-        qs = Booking.objects.select_related("mentor__user", "student").order_by("-start_at")
+        qs = Booking.objects.select_related(
+            "mentor__user", "student", "package_purchase", "seminar"
+        ).order_by("-start_at")
         params = self.request.query_params
         if (value := params.get("status")) in BookingStatus.values:
             qs = qs.filter(status=value)
@@ -264,7 +325,30 @@ class AdminBookingListView(generics.ListAPIView):
 class AdminBookingDetailView(generics.RetrieveAPIView):
     permission_classes = [IsAdminRole]
     serializer_class = BookingDetailSerializer
-    queryset = Booking.objects.select_related("mentor__user", "student").prefetch_related("events")
+    queryset = Booking.objects.select_related(
+        "mentor__user", "student", "package_purchase", "seminar"
+    ).prefetch_related("events")
+
+
+class AdminBookingMeetingPlaceView(APIView):
+    permission_classes = [IsAdminRole]
+
+    @extend_schema(
+        tags=["Admin"],
+        summary="Reveal the exact meeting place of an in-person booking",
+        description="For safety and incident handling. Works in any status. A reason is required and every "
+        "request is recorded in the audit log (the place itself is not logged).",
+        request=RequiredReasonSerializer,
+        responses={200: MeetingPlaceRevealSerializer, **errors(E400, AUTHED, E404, E409)},
+    )
+    def post(self, request, pk):
+        booking = get_object_or_404(Booking.objects.select_related("seminar"), pk=pk)
+        serializer = RequiredReasonSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = services.reveal_meeting_place(
+            booking, actor=request.user, reason=serializer.validated_data["reason"], request=request
+        )
+        return Response(MeetingPlaceRevealSerializer(result).data)
 
 
 class AdminCancelSerializer(RequiredReasonSerializer):

@@ -1,6 +1,6 @@
 "use client";
 
-import { CreditCard, Star } from "lucide-react";
+import { CreditCard, Link2, MapPin, Star } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { getErrorMessage, isApiError } from "@/lib/api/errors";
@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfirmationDialog } from "@/components/feedback/confirmation-dialog";
 
-type Dialog = "cancel" | "accept" | "decline" | "complete" | "review" | null;
+type Dialog = "cancel" | "accept" | "decline" | "complete" | "review" | "place" | "link" | null;
 
 /** Statuses that hold a time slot. Anything else is closed and offers no session actions. */
 export const ACTIVE_STATUSES: ReadonlySet<BookingStatus> = new Set(["pending_payment", "requested", "confirmed"]);
@@ -35,13 +35,19 @@ export function bookingPermissions(booking: Booking, perspective: "student" | "m
   const canReview = !isMentor && booking.status === "completed" && !booking.has_review;
   const holdLive = !booking.hold_expires_at || new Date(booking.hold_expires_at).getTime() > now;
   const canPay = !isMentor && booking.status === "pending_payment" && holdLive && !started;
+  const canSetPlace =
+    isMentor && booking.format === "in_person" && booking.status === "confirmed" && !started;
+  const canSetLink =
+    isMentor && booking.format === "online" && !booking.seminar && booking.status === "confirmed" && !started;
   return {
     canAccept,
     canComplete,
     canCancel,
     canReview,
     canPay,
-    any: canAccept || canComplete || canCancel || canReview || canPay,
+    canSetPlace,
+    canSetLink,
+    any: canAccept || canComplete || canCancel || canReview || canPay || canSetPlace || canSetLink,
   };
 }
 
@@ -65,7 +71,11 @@ export function BookingActions({
   const [opening, setOpening] = useState(false);
   useReloadOnBack();
   const isMentor = perspective === "mentor";
-  const { canAccept, canComplete, canCancel, canReview, canPay, any } = bookingPermissions(booking, perspective);
+  const { canAccept, canComplete, canCancel, canReview, canPay, canSetPlace, canSetLink, any } = bookingPermissions(
+    booking,
+    perspective,
+  );
+  const inPerson = booking.format === "in_person";
 
   if (!any) return null;
 
@@ -117,6 +127,18 @@ export function BookingActions({
           Mark as completed
         </Button>
       ) : null}
+      {canSetLink ? (
+        <Button size="sm" variant="outline" onClick={() => setDialog("link")}>
+          <Link2 aria-hidden="true" />
+          Change meeting link
+        </Button>
+      ) : null}
+      {canSetPlace ? (
+        <Button size="sm" variant={booking.meeting_place ? "outline" : "default"} onClick={() => setDialog("place")}>
+          <MapPin aria-hidden="true" />
+          {booking.meeting_place ? "Change meeting place" : "Add meeting place"}
+        </Button>
+      ) : null}
       {canReview ? (
         <Button size="sm" onClick={() => setDialog("review")}>
           <Star aria-hidden="true" />
@@ -133,9 +155,49 @@ export function BookingActions({
         open={dialog === "accept"}
         onOpenChange={close}
         title="Accept this request?"
-        description={`${booking.student.display_name} will be notified and the session will be confirmed.`}
+        description={
+          inPerson
+            ? `${booking.student.display_name} will be notified and the session will be confirmed. Tell them where to meet in ${booking.in_person_area}: somewhere public, never your home.`
+            : `${booking.student.display_name} will be notified and the session will be confirmed.`
+        }
         confirmLabel="Accept request"
-        onConfirm={run(() => api.bookings.accept(booking.id), "Booking confirmed")}
+        reason={
+          inPerson
+            ? { label: "Meeting place", placeholder: "e.g. Café name, street, and how to find you" }
+            : {
+                label: "Meeting link for this session (optional)",
+                placeholder: "https://… (leave empty to use your default link)",
+              }
+        }
+        onConfirm={(detail) =>
+          run(
+            () =>
+              api.bookings.accept(booking.id, inPerson ? { meetingPlace: detail } : { meetingUrl: detail }),
+            "Booking confirmed",
+          )()
+        }
+      />
+      <ConfirmationDialog
+        open={dialog === "link"}
+        onOpenChange={close}
+        title="Change the meeting link?"
+        description={`Use any video tool you and ${booking.student.display_name} agree on (Zoom, Google Meet, Teams…). They'll see the new link on their booking.`}
+        confirmLabel="Save link"
+        reason={{ label: "Meeting link", placeholder: "https://…", required: true }}
+        onConfirm={(url) => run(() => api.bookings.setMeetingLink(booking.id, url), "Meeting link saved")()}
+      />
+      <ConfirmationDialog
+        open={dialog === "place"}
+        onOpenChange={close}
+        title="Where will you meet?"
+        description={`Only ${booking.student.display_name} sees this, once the session is confirmed. Choose somewhere public in ${booking.in_person_area}.`}
+        confirmLabel="Save meeting place"
+        reason={{
+          label: "Meeting place",
+          placeholder: "e.g. Café name, street, and how to find you",
+          required: true,
+        }}
+        onConfirm={(place) => run(() => api.bookings.setMeetingPlace(booking.id, place), "Meeting place saved")()}
       />
       <ConfirmationDialog
         open={dialog === "decline"}
@@ -178,7 +240,16 @@ export function BookingActions({
 }
 
 function cancelDescription(booking: Booking, isMentor: boolean): string {
-  if (isMentor) return "The student will be notified. Any payment is refunded in full.";
+  if (isMentor) {
+    return booking.package
+      ? "The student will be notified and the session goes back to their package."
+      : "The student will be notified. Any payment is refunded in full.";
+  }
+  if (booking.package) {
+    return booking.status === "confirmed"
+      ? "Cancel at least 24 hours before the session and it goes back to your package. Later than that, it counts as used."
+      : "The mentor will be notified and the session goes back to your package.";
+  }
   if (booking.price.amount_cents === 0) return "The mentor will be notified.";
   if (booking.status === "pending_payment") return "The held time is released. You won't be charged.";
   if (booking.status !== "confirmed")

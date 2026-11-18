@@ -155,6 +155,19 @@ export function MentorFilters({
         </div>
       </FormFieldset>
 
+      <FormFieldset legend="Format">
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="in_person"
+            value="1"
+            defaultChecked={params.in_person}
+            className="size-4 accent-primary"
+          />
+          Meets in person
+        </label>
+      </FormFieldset>
+
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={pending} className="flex-1">
           {pending ? "Applying…" : "Apply filters"}

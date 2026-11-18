@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, MapPin } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Booking, BookingStatus } from "@/lib/api/types";
@@ -28,6 +28,9 @@ export function AdminBookings() {
   const [cancelling, setCancelling] = useState<Booking | null>(null);
   const [refund, setRefund] = useState(true);
   const [page, setPage] = useState(1);
+  const [locating, setLocating] = useState<Booking | null>(null);
+  // Places revealed in this page view only; never cached or stored.
+  const [revealed, setRevealed] = useState<Record<string, string>>({});
   const query = useApiQuery(`admin:bookings:${status}:${page}`, () =>
     api.admin.bookings({ status: status || undefined, page }),
   );
@@ -80,7 +83,28 @@ export function AdminBookings() {
                   {page.results.map((b) => (
                     <TableRow key={b.id}>
                       <TableCell className="whitespace-nowrap">{formatDateTime(b.start_at, user.timezone)}</TableCell>
-                      <TableCell>{b.service_title}</TableCell>
+                      <TableCell>
+                        {b.service_title}
+                        {b.seminar ? <span className="block text-xs text-muted-foreground">Group seminar</span> : null}
+                        {b.format === "in_person" ? (
+                          <span className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                            <MapPin className="size-3.5" aria-hidden="true" />
+                            In person{b.in_person_area ? ` · ${b.in_person_area}` : ""}
+                            {revealed[b.id] !== undefined ? (
+                              <span className="font-medium text-foreground">{revealed[b.id]}</span>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="link"
+                                className="h-auto p-0 text-xs"
+                                onClick={() => setLocating(b)}
+                              >
+                                Show exact location
+                              </Button>
+                            )}
+                          </span>
+                        ) : null}
+                      </TableCell>
                       <TableCell>{b.mentor.display_name}</TableCell>
                       <TableCell>{b.student.display_name}</TableCell>
                       <TableCell>
@@ -134,6 +158,22 @@ export function AdminBookings() {
           </label>
         ) : null}
       </ConfirmationDialog>
+      <ConfirmationDialog
+        open={locating !== null}
+        onOpenChange={(open) => !open && setLocating(null)}
+        title="Show the exact meeting location?"
+        description="Use this only for safety or to handle a report. Your name, the time and your reason are recorded in the audit log."
+        confirmLabel="Show location"
+        reason={{ label: "Why do you need it?", placeholder: "e.g. Student reported a safety concern", required: true }}
+        onConfirm={async (reason) => {
+          if (!locating) return;
+          const result = await api.admin.revealMeetingPlace(locating.id, reason);
+          setRevealed((current) => ({
+            ...current,
+            [locating.id]: result.meeting_place ?? "The mentor hasn't set a place yet.",
+          }));
+        }}
+      />
       <AdminSecurityNote />
     </div>
   );

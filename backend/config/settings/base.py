@@ -37,6 +37,8 @@ INSTALLED_APPS = [
     "apps.mentors",
     "apps.students",
     "apps.bookings",
+    "apps.packages",
+    "apps.seminars",
     "apps.payments",
     "apps.reviews",
     "apps.moderation",
@@ -190,6 +192,8 @@ SPECTACULAR_SETTINGS = {
     ],
     "ENUM_NAME_OVERRIDES": {
         "RoleEnum": "apps.users.models.Role",
+        "SessionFormatEnum": "apps.mentors.models.SessionFormat",
+        "SeminarStatusEnum": "apps.seminars.models.SeminarStatus",
         "BookingStatusEnum": "apps.bookings.models.BookingStatus",
         "VerificationStatusEnum": "apps.mentors.models.VerificationStatus",
         "VerificationRequestStatusEnum": "apps.mentors.models.VerificationRequestStatus",
@@ -223,6 +227,8 @@ ADMIN_URL = env("DJANGO_ADMIN_URL", default="django-admin/")
 # Marketplace rules (docs/PRODUCT_REQUIREMENTS.md §6).
 PLATFORM_CURRENCY = env("PLATFORM_CURRENCY", default="USD")
 PLATFORM_FEE_BPS = env.int("PLATFORM_FEE_BPS", default=1500)  # 15.00%
+# Lowest price a mentor can set for a session or a seminar seat (no free sessions by default).
+MIN_SESSION_PRICE_CENTS = env.int("MIN_SESSION_PRICE_CENTS", default=100)
 # How long a paid booking holds its slot while the student pays. Checkout sessions last at least
 # CHECKOUT_MIN_MINUTES (Stripe's minimum is 30), and the hold is extended to match.
 BOOKING_HOLD_MINUTES = env.int("BOOKING_HOLD_MINUTES", default=30)

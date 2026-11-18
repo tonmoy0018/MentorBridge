@@ -75,6 +75,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/bookings/{id}/meeting-place/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reveal the exact meeting place of an in-person booking
+         * @description For safety and incident handling. Works in any status. A reason is required and every request is recorded in the audit log (the place itself is not logged).
+         */
+        post: operations["admin_bookings_meeting_place_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/notifications/": {
         parameters: {
             query?: never;
@@ -242,6 +262,60 @@ export interface paths {
         put?: never;
         /** Publish a hidden review again */
         post: operations["admin_reviews_publish_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/seminars/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Upcoming group seminars */
+        get: operations["admin_seminars_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/seminars/{id}/cancel/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel any group seminar */
+        post: operations["admin_seminars_cancel_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/seminars/{id}/meeting-place/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reveal the exact place of an in-person seminar
+         * @description For safety and incident handling. A reason is required and every request is recorded in the audit log (the place itself is not logged).
+         */
+        post: operations["admin_seminars_meeting_place_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -605,6 +679,8 @@ export interface paths {
          *
          *     * Free services → `requested` (or `confirmed` if the mentor auto-accepts).
          *     * Paid services → `pending_payment`, held for `BOOKING_HOLD_MINUTES`. It only advances when the payment provider confirms payment server-side (not yet available: holds expire).
+         *     * `format=in_person` adds the service's in-person extra to the price.
+         *     * `package_purchase_id` → paid by the package (price 0), in the package's format.
          */
         post: operations["bookings_create"];
         delete?: never;
@@ -715,6 +791,46 @@ export interface paths {
         put?: never;
         /** Decline a booking request (mentor) */
         post: operations["bookings_decline_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bookings/{id}/meeting-link/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set the call link for an online session (mentor)
+         * @description Use any video tool you and the student agree on. Shown to the student once confirmed.
+         */
+        post: operations["bookings_meeting_link_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bookings/{id}/meeting-place/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set where to meet for an in-person session (mentor)
+         * @description Shown to the student once the session is confirmed. Never included in emails.
+         */
+        post: operations["bookings_meeting_place_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -939,6 +1055,48 @@ export interface paths {
         patch: operations["me_mentor_experiences_partial_update"];
         trace?: never;
     };
+    "/api/v1/me/mentor/packages/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List my session packages (including hidden ones) */
+        get: operations["me_mentor_packages_list"];
+        put?: never;
+        /**
+         * Create a session package
+         * @description N sessions of one of your services at a package price, used within `validity_days`.
+         */
+        post: operations["me_mentor_packages_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/mentor/packages/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a package nobody has bought */
+        delete: operations["me_mentor_packages_destroy"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a session package
+         * @description Changes apply to new purchases only.
+         */
+        patch: operations["me_mentor_packages_partial_update"];
+        trace?: never;
+    };
     "/api/v1/me/mentor/payouts/": {
         parameters: {
             query?: never;
@@ -993,6 +1151,87 @@ export interface paths {
         post: operations["me_mentor_profile_avatar_create"];
         /** Remove my profile photo */
         delete: operations["me_mentor_profile_avatar_destroy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/mentor/seminars/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List my group seminars */
+        get: operations["me_mentor_seminars_list"];
+        put?: never;
+        /**
+         * Schedule a group seminar
+         * @description A fixed-time session of one of your services for several students. The time must be free.
+         */
+        post: operations["me_mentor_seminars_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/mentor/seminars/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update a group seminar
+         * @description Once students have registered, the time, length, price and format can't change.
+         */
+        patch: operations["me_mentor_seminars_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/me/mentor/seminars/{id}/cancel/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel a group seminar
+         * @description Every seat is cancelled and refunded in full; each student gets one email.
+         */
+        post: operations["me_mentor_seminars_cancel_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/mentor/seminars/{id}/complete/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark a group seminar as completed
+         * @description Confirmed seats become completed, so students can leave a review.
+         */
+        post: operations["me_mentor_seminars_complete_create"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1089,6 +1328,43 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["me_student_goals_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/me/student/packages/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List my session packages */
+        get: operations["me_student_packages_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/student/packages/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get one of my session packages
+         * @description Poll this after checkout: `status` becomes `active` once payment is confirmed.
+         */
+        get: operations["me_student_packages_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/me/student/profile/": {
@@ -1231,6 +1507,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/packages/{id}/purchase/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Buy a multi-session option
+         * @description Starts (or resumes) checkout for the bundle in the chosen format. The bundle stays `pending_payment` and can't be used until the payment provider confirms payment; a browser redirect back from checkout changes nothing.
+         */
+        post: operations["packages_purchase_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/payments/webhooks/{provider}/": {
         parameters: {
             query?: never;
@@ -1265,6 +1561,26 @@ export interface paths {
          * @description Report a review, a mentor profile, a booking you took part in, or a user you've had a booking with. One open report per item per reporter.
          */
         post: operations["reports_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/seminars/{id}/register/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register for a group seminar
+         * @description Free seminars: the seat is confirmed at once. Paid seminars: the seat is held (`pending_payment`) like a paid booking and confirmed when the provider confirms payment.
+         */
+        post: operations["seminars_register_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1343,6 +1659,12 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AcceptBookingRequest: {
+            /** @description In-person sessions: where to meet. */
+            meeting_place?: string;
+            /** @description Online sessions: the call link for this session. Defaults to the mentor's link. */
+            meeting_url?: string;
+        };
         AdminCancelRequest: {
             reason: string;
             /**
@@ -1377,7 +1699,14 @@ export interface components {
             /** Format: uuid */
             readonly id: string;
             /** Format: uuid */
-            booking_id: string;
+            readonly booking_id: string | null;
+            /**
+             * Format: uuid
+             * @description Set when the payment is for a session bundle.
+             */
+            readonly package_purchase_id: string | null;
+            /** @description What was paid for. */
+            readonly title: string;
             student_display_name: string;
             mentor_display_name: string;
             readonly amount: components["schemas"]["Money"];
@@ -1439,6 +1768,34 @@ export interface components {
             readonly booking_id: string;
             /** Format: date-time */
             readonly created_at: string;
+        };
+        /** @description Admin list: everything but the exact place (revealed only through the audited endpoint). */
+        AdminSeminar: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly title: string;
+            readonly description: string;
+            readonly service: components["schemas"]["SeminarService"];
+            /** Format: date-time */
+            readonly start_at: string;
+            /** Format: date-time */
+            readonly end_at: string;
+            readonly duration_minutes: number;
+            readonly capacity: number;
+            readonly seats_left: number;
+            /** @description Per seat. */
+            readonly price: components["schemas"]["Money"];
+            readonly format: components["schemas"]["SessionFormatEnum"];
+            readonly in_person_area: string;
+            readonly seats_taken: number;
+            /**
+             * Format: uri
+             * @description Defaults to the mentor's link.
+             */
+            readonly meeting_url: string;
+            readonly status: components["schemas"]["SeminarStatusEnum"];
+            readonly cancellation_reason: string;
+            readonly attendees: components["schemas"]["SeminarAttendee"][];
         };
         AdminStats: {
             users: components["schemas"]["UserCounts"];
@@ -1534,6 +1891,11 @@ export interface components {
             readonly student_note: string;
             /** Format: uri */
             readonly meeting_url: string | null;
+            readonly format: components["schemas"]["SessionFormatEnum"];
+            readonly in_person_area: string;
+            readonly meeting_place: string | null;
+            readonly package: components["schemas"]["BookingPackage"] | null;
+            readonly seminar: components["schemas"]["BookingPackage"] | null;
             readonly mentor: components["schemas"]["BookingMentor"];
             readonly student: components["schemas"]["BookingParty"];
             /** Format: date-time */
@@ -1568,6 +1930,11 @@ export interface components {
             readonly student_note: string;
             /** Format: uri */
             readonly meeting_url: string | null;
+            readonly format: components["schemas"]["SessionFormatEnum"];
+            readonly in_person_area: string;
+            readonly meeting_place: string | null;
+            readonly package: components["schemas"]["BookingPackage"] | null;
+            readonly seminar: components["schemas"]["BookingPackage"] | null;
             readonly mentor: components["schemas"]["BookingMentor"];
             readonly student: components["schemas"]["BookingParty"];
             /** Format: date-time */
@@ -1603,6 +1970,11 @@ export interface components {
             avatar_url: string | null;
             slug: string;
             headline: string;
+        };
+        BookingPackage: {
+            /** Format: uuid */
+            id: string;
+            title: string;
         };
         BookingParty: {
             /** Format: uuid */
@@ -1934,6 +2306,18 @@ export interface components {
             start_at: string;
             /** @default  */
             student_note: string;
+            /**
+             * @description Defaults to online when the service offers it. Ignored with a package.
+             *
+             *     * `online` - Online
+             *     * `in_person` - In person
+             */
+            format?: components["schemas"]["SessionFormatEnum"];
+            /**
+             * Format: uuid
+             * @description Use a session from one of your packages instead of paying.
+             */
+            package_purchase_id?: string;
         };
         CreateReviewRequest: {
             rating: number;
@@ -2020,6 +2404,12 @@ export interface components {
             end_date?: string | null;
             description?: string;
         };
+        FormatPrices: {
+            /** @description Null if the session isn't offered online. */
+            online: components["schemas"]["Money"] | null;
+            /** @description Null if the session isn't offered in person. */
+            in_person: components["schemas"]["Money"] | null;
+        };
         /**
          * @description * `not_started` - Not started
          *     * `in_progress` - In progress
@@ -2060,6 +2450,19 @@ export interface components {
             /** Format: email */
             email: string;
             password: string;
+        };
+        MeetingLinkRequest: {
+            /** Format: uri */
+            meeting_url: string;
+        };
+        MeetingPlaceRequest: {
+            meeting_place: string;
+        };
+        MeetingPlaceReveal: {
+            format: components["schemas"]["SessionFormatEnum"];
+            in_person_area: string;
+            /** @description Null if the mentor hasn't set one. */
+            meeting_place: string | null;
         };
         /** @description The authenticated mentor's full profile, including private settings. */
         MentorOwnProfile: {
@@ -2130,10 +2533,44 @@ export interface components {
             readonly starting_price: components["schemas"]["Money"] | null;
             /** Format: date-time */
             readonly next_available_at: string;
+            /** @description Has a service offered in person. */
+            readonly offers_in_person: boolean;
             readonly bio: string;
             readonly timezone: string;
             experiences: components["schemas"]["Experience"][];
             readonly services: components["schemas"]["Service"][];
+            readonly packages: components["schemas"]["Package"][];
+            /** @description Upcoming group seminars with seats left. */
+            readonly seminars: components["schemas"]["Seminar"][];
+        };
+        /** @description The mentor's own view, with private details and who's coming. */
+        MentorSeminar: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly title: string;
+            readonly description: string;
+            readonly service: components["schemas"]["SeminarService"];
+            /** Format: date-time */
+            readonly start_at: string;
+            /** Format: date-time */
+            readonly end_at: string;
+            readonly duration_minutes: number;
+            readonly capacity: number;
+            readonly seats_left: number;
+            /** @description Per seat. */
+            readonly price: components["schemas"]["Money"];
+            readonly format: components["schemas"]["SessionFormatEnum"];
+            readonly in_person_area: string;
+            readonly seats_taken: number;
+            readonly meeting_place: string;
+            /**
+             * Format: uri
+             * @description Defaults to the mentor's link.
+             */
+            readonly meeting_url: string;
+            readonly status: components["schemas"]["SeminarStatusEnum"];
+            readonly cancellation_reason: string;
+            readonly attendees: components["schemas"]["SeminarAttendee"][];
         };
         MentorStatusCounts: {
             draft: number;
@@ -2171,11 +2608,78 @@ export interface components {
             readonly starting_price: components["schemas"]["Money"] | null;
             /** Format: date-time */
             readonly next_available_at: string;
+            /** @description Has a service offered in person. */
+            readonly offers_in_person: boolean;
         };
         /** @description Money as integer minor units + ISO currency. Never floats. */
         Money: {
             amount_cents: number;
             currency: string;
+        };
+        /** @description A multi-session option of a service, priced for each format the service is offered in. */
+        Package: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly title: string;
+            readonly session_count: number;
+            readonly discount_percent: number;
+            readonly validity_days: number;
+            readonly prices: components["schemas"]["FormatPrices"];
+            /** @description The same sessions booked one by one. */
+            readonly regular_prices: components["schemas"]["FormatPrices"];
+            readonly service: components["schemas"]["PackageService"];
+            readonly is_active: boolean;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        /** @description A student's package with its remaining sessions. Expects `with_usage()` annotations. */
+        PackagePurchase: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly title: string;
+            readonly format: components["schemas"]["SessionFormatEnum"];
+            readonly status: components["schemas"]["PackagePurchaseStatusEnum"];
+            readonly session_count: number;
+            readonly sessions_used: number;
+            readonly sessions_remaining: number;
+            readonly duration_minutes: number;
+            readonly price: components["schemas"]["Money"];
+            /**
+             * Format: date-time
+             * @description Set when the bundle becomes active.
+             */
+            readonly expires_at: string | null;
+            readonly is_expired: boolean;
+            readonly mentor: components["schemas"]["BookingMentor"];
+            /** Format: uuid */
+            readonly service_id: string;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        /**
+         * @description * `pending_payment` - Awaiting payment
+         *     * `active` - Active
+         *     * `cancelled` - Cancelled
+         *     * `refunded` - Refunded
+         * @enum {string}
+         */
+        PackagePurchaseStatusEnum: "pending_payment" | "active" | "cancelled" | "refunded";
+        PackageService: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            duration_minutes: number;
+        };
+        PackageWriteRequest: {
+            /** Format: uuid */
+            service_id: string;
+            session_count: number;
+            discount_percent: number;
+            validity_days: number;
+            /** @default true */
+            is_active: boolean;
         };
         PaginatedAdminNotificationList: {
             /** @example 123 */
@@ -2441,6 +2945,31 @@ export interface components {
             booking_horizon_days?: number;
             buffer_minutes?: number;
         };
+        PatchedPackageWriteRequest: {
+            /** Format: uuid */
+            service_id?: string;
+            session_count?: number;
+            discount_percent?: number;
+            validity_days?: number;
+            /** @default true */
+            is_active: boolean;
+        };
+        PatchedSeminarWriteRequest: {
+            /** Format: uuid */
+            service_id?: string;
+            title?: string;
+            description?: string;
+            /** Format: date-time */
+            start_at?: string;
+            duration_minutes?: components["schemas"]["DurationMinutesEnum"];
+            capacity?: number;
+            price_cents?: number;
+            currency?: string;
+            format?: components["schemas"]["SessionFormatEnum"];
+            in_person_area?: string;
+            meeting_place?: string;
+            meeting_url?: string;
+        };
         PatchedServiceWriteRequest: {
             title?: string;
             description?: string;
@@ -2449,6 +2978,10 @@ export interface components {
             currency?: string;
             /** @default true */
             is_active: boolean;
+            online?: boolean;
+            in_person?: boolean;
+            in_person_extra_cents?: number;
+            in_person_area?: string;
         };
         PatchedStudentProfileRequest: {
             headline?: string;
@@ -2520,10 +3053,29 @@ export interface components {
             /** @description False until a payment provider is integrated; paid sessions can't be booked. */
             payments_enabled: boolean;
             currency: string;
+            /** @description Lowest price a mentor can set. */
+            min_session_price: components["schemas"]["Money"];
             booking_hold_minutes: number;
             mentor_response_hours: number;
             free_cancellation_hours: number;
             require_verified_email: boolean;
+        };
+        PurchaseRequestRequest: {
+            /**
+             * @description Defaults to online when offered.
+             *
+             *     * `online` - Online
+             *     * `in_person` - In person
+             */
+            format?: components["schemas"]["SessionFormatEnum"];
+        };
+        PurchaseResponse: {
+            purchase: components["schemas"]["PackagePurchase"];
+            /**
+             * Format: uri
+             * @description Pay here; the bundle becomes usable once payment is confirmed.
+             */
+            checkout_url: string | null;
         };
         ReasonRequest: {
             reason?: string;
@@ -2534,7 +3086,7 @@ export interface components {
             /** Format: uuid */
             readonly payment_id: string;
             /** Format: uuid */
-            readonly booking_id: string;
+            readonly booking_id: string | null;
             readonly amount: components["schemas"]["Money"];
             readonly commission_reversed: components["schemas"]["Money"];
             readonly mentor_share_reversed: components["schemas"]["Money"];
@@ -2686,13 +3238,72 @@ export interface components {
          * @enum {string}
          */
         RoleEnum: "student" | "mentor" | "admin";
+        /** @description Public view of a seminar: no attendee details, no exact meeting place. Expects `with_seats()`. */
+        Seminar: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly title: string;
+            readonly description: string;
+            readonly service: components["schemas"]["SeminarService"];
+            /** Format: date-time */
+            readonly start_at: string;
+            /** Format: date-time */
+            readonly end_at: string;
+            readonly duration_minutes: number;
+            readonly capacity: number;
+            readonly seats_left: number;
+            /** @description Per seat. */
+            readonly price: components["schemas"]["Money"];
+            readonly format: components["schemas"]["SessionFormatEnum"];
+            readonly in_person_area: string;
+        };
+        SeminarAttendee: {
+            /** Format: uuid */
+            booking_id: string;
+            display_name: string;
+            status: components["schemas"]["BookingStatusEnum"];
+        };
+        SeminarService: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+        };
+        /**
+         * @description * `scheduled` - Scheduled
+         *     * `completed` - Completed
+         *     * `cancelled` - Cancelled
+         * @enum {string}
+         */
+        SeminarStatusEnum: "scheduled" | "completed" | "cancelled";
+        SeminarWriteRequest: {
+            /** Format: uuid */
+            service_id: string;
+            title?: string;
+            description?: string;
+            /** Format: date-time */
+            start_at: string;
+            duration_minutes: components["schemas"]["DurationMinutesEnum"];
+            capacity: number;
+            price_cents: number;
+            currency?: string;
+            format?: components["schemas"]["SessionFormatEnum"];
+            in_person_area?: string;
+            meeting_place?: string;
+            meeting_url?: string;
+        };
         Service: {
             /** Format: uuid */
             readonly id: string;
             readonly title: string;
             readonly description: string;
             readonly duration_minutes: number;
+            /** @description Price of an online session. */
             readonly price: components["schemas"]["Money"];
+            readonly online: boolean;
+            readonly in_person: boolean;
+            /** @description Added to `price` for an in-person session. */
+            readonly in_person_extra: components["schemas"]["Money"];
+            readonly in_person_area: string;
             readonly is_active: boolean;
             /** Format: date-time */
             readonly created_at: string;
@@ -2707,7 +3318,17 @@ export interface components {
             currency?: string;
             /** @default true */
             is_active: boolean;
+            online?: boolean;
+            in_person?: boolean;
+            in_person_extra_cents?: number;
+            in_person_area?: string;
         };
+        /**
+         * @description * `online` - Online
+         *     * `in_person` - In person
+         * @enum {string}
+         */
+        SessionFormatEnum: "online" | "in_person";
         Skill: {
             readonly id: number;
             name: string;
@@ -2962,6 +3583,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BookingDetail"];
+                };
+            };
+            /** @description Validation error (`validation_error`); field errors in `details.fields`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not logged in (`not_authenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Wrong role or CSRF failure (`permission_denied`, `csrf_failed`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found, or not visible to you (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflicts with the current state (e.g. `slot_unavailable`, `invalid_state`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    admin_bookings_meeting_place_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequiredReasonRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingPlaceReveal"];
                 };
             };
             /** @description Validation error (`validation_error`); field errors in `details.fields`. */
@@ -3532,6 +4223,183 @@ export interface operations {
             };
             /** @description Not found, or not visible to you (`not_found`). */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    admin_seminars_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSeminar"][];
+                };
+            };
+            /** @description Not logged in (`not_authenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Wrong role or CSRF failure (`permission_denied`, `csrf_failed`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    admin_seminars_cancel_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequiredReasonRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Seminar"];
+                };
+            };
+            /** @description Validation error (`validation_error`); field errors in `details.fields`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not logged in (`not_authenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Wrong role or CSRF failure (`permission_denied`, `csrf_failed`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found, or not visible to you (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflicts with the current state (e.g. `slot_unavailable`, `invalid_state`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    admin_seminars_meeting_place_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequiredReasonRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingPlaceReveal"];
+                };
+            };
+            /** @description Validation error (`validation_error`); field errors in `details.fields`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not logged in (`not_authenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Wrong role or CSRF failure (`permission_denied`, `csrf_failed`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found, or not visible to you (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflicts with the current state (e.g. `slot_unavailable`, `invalid_state`). */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4572,7 +5440,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["AcceptBookingRequest"];
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -4580,6 +5452,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BookingDetail"];
+                };
+            };
+            /** @description Validation error (`validation_error`); field errors in `details.fields`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Not logged in (`not_authenticated`). */
@@ -4816,6 +5697,146 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RequiredReasonRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingDetail"];
+                };
+            };
+            /** @description Validation error (`validation_error`); field errors in `details.fields`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not logged in (`not_authenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Wrong role or CSRF failure (`permission_denied`, `csrf_failed`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found, or not visible to you (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflicts with the current state (e.g. `slot_unavailable`, `invalid_state`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    bookings_meeting_link_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MeetingLinkRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingDetail"];
+                };
+            };
+            /** @description Validation error (`validation_error`); field errors in `details.fields`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not logged in (`not_authenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Wrong role or CSRF failure (`permission_denied`, `csrf_failed`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found, or not visible to you (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflicts with the current state (e.g. `slot_unavailable`, `invalid_state`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    bookings_meeting_place_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MeetingPlaceRequest"];
             };
         };
         responses: {
@@ -5374,6 +6395,192 @@ export interface operations {
             };
         };
     };
+    me_mentor_packages_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Package"][];
+                };
+            };
+        };
+    };
+    me_mentor_packages_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PackageWriteRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Package"];
+                };
+            };
+            /** @description Validation error (`validation_error`); field errors in `details.fields`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not logged in (`not_authenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Wrong role or CSRF failure (`permission_denied`, `csrf_failed`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    me_mentor_packages_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not logged in (`not_authenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Wrong role or CSRF failure (`permission_denied`, `csrf_failed`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found, or not visible to you (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflicts with the current state (e.g. `slot_unavailable`, `invalid_state`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    me_mentor_packages_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedPackageWriteRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Package"];
+                };
+            };
+            /** @description Validation error (`validation_error`); field errors in `details.fields`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not logged in (`not_authenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Wrong role or CSRF failure (`permission_denied`, `csrf_failed`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found, or not visible to you (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     me_mentor_payouts_list: {
         parameters: {
             query?: {
@@ -5583,6 +6790,299 @@ export interface operations {
             };
             /** @description Wrong role or CSRF failure (`permission_denied`, `csrf_failed`). */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    me_mentor_seminars_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MentorSeminar"][];
+                };
+            };
+            /** @description Not logged in (`not_authenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Wrong role or CSRF failure (`permission_denied`, `csrf_failed`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    me_mentor_seminars_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SeminarWriteRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MentorSeminar"];
+                };
+            };
+            /** @description Validation error (`validation_error`); field errors in `details.fields`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not logged in (`not_authenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Wrong role or CSRF failure (`permission_denied`, `csrf_failed`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflicts with the current state (e.g. `slot_unavailable`, `invalid_state`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    me_mentor_seminars_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedSeminarWriteRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MentorSeminar"];
+                };
+            };
+            /** @description Validation error (`validation_error`); field errors in `details.fields`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not logged in (`not_authenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Wrong role or CSRF failure (`permission_denied`, `csrf_failed`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found, or not visible to you (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflicts with the current state (e.g. `slot_unavailable`, `invalid_state`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    me_mentor_seminars_cancel_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequiredReasonRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MentorSeminar"];
+                };
+            };
+            /** @description Validation error (`validation_error`); field errors in `details.fields`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not logged in (`not_authenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Wrong role or CSRF failure (`permission_denied`, `csrf_failed`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found, or not visible to you (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflicts with the current state (e.g. `slot_unavailable`, `invalid_state`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    me_mentor_seminars_complete_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MentorSeminar"];
+                };
+            };
+            /** @description Not logged in (`not_authenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Wrong role or CSRF failure (`permission_denied`, `csrf_failed`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found, or not visible to you (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflicts with the current state (e.g. `slot_unavailable`, `invalid_state`). */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -6049,6 +7549,94 @@ export interface operations {
             };
         };
     };
+    me_student_packages_list: {
+        parameters: {
+            query?: {
+                /** @description Only packages with this mentor (id). */
+                mentor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackagePurchase"][];
+                };
+            };
+            /** @description Not logged in (`not_authenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Wrong role or CSRF failure (`permission_denied`, `csrf_failed`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    me_student_packages_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackagePurchase"];
+                };
+            };
+            /** @description Not logged in (`not_authenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Wrong role or CSRF failure (`permission_denied`, `csrf_failed`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found, or not visible to you (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     me_student_profile_retrieve: {
         parameters: {
             query?: never;
@@ -6227,6 +7815,8 @@ export interface operations {
             query?: {
                 available_within_days?: number;
                 country?: string;
+                /** @description Only mentors who meet in person. */
+                in_person?: boolean;
                 industry?: string[];
                 language?: string;
                 /**
@@ -6383,6 +7973,85 @@ export interface operations {
             };
         };
     };
+    packages_purchase_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PurchaseRequestRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseResponse"];
+                };
+            };
+            /** @description Validation error (`validation_error`); field errors in `details.fields`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not logged in (`not_authenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Wrong role or CSRF failure (`permission_denied`, `csrf_failed`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found, or not visible to you (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflicts with the current state (e.g. `slot_unavailable`, `invalid_state`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Rate limited (`throttled`); see the Retry-After header. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     payments_webhooks_create: {
         parameters: {
             query?: never;
@@ -6440,6 +8109,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not logged in (`not_authenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Wrong role or CSRF failure (`permission_denied`, `csrf_failed`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found, or not visible to you (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflicts with the current state (e.g. `slot_unavailable`, `invalid_state`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Rate limited (`throttled`); see the Retry-After header. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    seminars_register_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingDetail"];
                 };
             };
             /** @description Not logged in (`not_authenticated`). */

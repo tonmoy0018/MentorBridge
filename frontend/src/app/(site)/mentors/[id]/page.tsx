@@ -17,6 +17,7 @@ import { PriceDisplay } from "@/components/mentors/price-display";
 import { ProfileHeader } from "@/components/mentors/profile-header";
 import { ReviewList } from "@/components/mentors/review-list";
 import { SaveMentorButton } from "@/components/mentors/save-mentor-button";
+import { SeminarList } from "@/components/mentors/seminar-list";
 import { ServiceList } from "@/components/mentors/service-list";
 
 type Props = PageProps<"/mentors/[id]">;
@@ -59,6 +60,8 @@ async function Profile({ params, searchParams }: Pick<Props, "params" | "searchP
   const { id } = await params;
   const query = await searchParams;
   const initialServiceId = typeof query.service === "string" ? query.service : undefined;
+  const initialPackageId = typeof query.package === "string" ? query.package : undefined;
+  const initialSeminarId = typeof query.seminar === "string" ? query.seminar : undefined;
 
   let mentor: MentorProfile;
   try {
@@ -182,24 +185,39 @@ async function Profile({ params, searchParams }: Pick<Props, "params" | "searchP
               Mentorship services
             </h2>
             {mentor.services.length > 0 ? (
-              <ServiceList services={mentor.services} mentorSlug={mentor.slug} paymentsEnabled={paymentsEnabled} />
+              <ServiceList
+                services={mentor.services}
+                packages={mentor.packages}
+                mentorSlug={mentor.slug}
+                paymentsEnabled={paymentsEnabled}
+              />
             ) : (
               <p className="text-muted-foreground">{firstName} hasn&apos;t published any services yet.</p>
             )}
           </section>
 
-          <section aria-labelledby="reviews-heading">
-            <h2 id="reviews-heading" className="text-xl font-semibold">
-              Reviews
-            </h2>
-            <p className="mt-1 mb-4 text-sm text-muted-foreground">
-              Reviews can only be left by students after a completed session.
-            </p>
-            <ReviewList mentorId={mentor.slug} initial={reviews} />
-          </section>
+          {mentor.seminars.length > 0 ? (
+            <section aria-labelledby="seminars-heading">
+              <h2 id="seminars-heading" className="text-xl font-semibold">
+                Group seminars
+              </h2>
+              <p className="mt-1 mb-4 text-sm text-muted-foreground">
+                Join {firstName} and other students at a fixed time, usually for less than a one-to-one session.
+              </p>
+              <SeminarList seminars={mentor.seminars} mentorSlug={mentor.slug} />
+            </section>
+          ) : null}
+
+
         </div>
 
-        <aside id="book" aria-labelledby="book-heading" className="min-w-0 scroll-mt-24 lg:sticky lg:top-24 lg:self-start">
+        {/* After the profile details on small screens (so booking comes before reviews), and a
+            sticky sidebar spanning both rows on large screens. */}
+        <aside
+          id="book"
+          aria-labelledby="book-heading"
+          className="min-w-0 scroll-mt-24 lg:sticky lg:top-24 lg:row-span-2 lg:self-start"
+        >
           <div className="min-w-0 rounded-xl border bg-card p-5 shadow-sm">
             <h2 id="book-heading" className="text-lg font-semibold">
               Book a session
@@ -208,8 +226,13 @@ async function Profile({ params, searchParams }: Pick<Props, "params" | "searchP
               Pick a service and a time that works for you.
             </p>
             <BookingWidget
-              key={initialServiceId ?? "default"}
+              key={`${initialServiceId ?? ""}:${initialPackageId ?? ""}:${initialSeminarId ?? ""}`}
               mentorId={mentor.slug}
+              mentorUuid={mentor.id}
+              initialPackageId={initialPackageId}
+              seminars={mentor.seminars}
+              packages={mentor.packages}
+              initialSeminarId={initialSeminarId}
               mentorFirstName={firstName}
               services={mentor.services}
               initialServiceId={initialServiceId}
@@ -219,6 +242,16 @@ async function Profile({ params, searchParams }: Pick<Props, "params" | "searchP
             />
           </div>
         </aside>
+
+        <section aria-labelledby="reviews-heading" className="min-w-0">
+          <h2 id="reviews-heading" className="text-xl font-semibold">
+            Reviews
+          </h2>
+          <p className="mt-1 mb-4 text-sm text-muted-foreground">
+            Reviews can only be left by students after a completed session.
+          </p>
+          <ReviewList mentorId={mentor.slug} initial={reviews} />
+        </section>
       </div>
 
       {/* Mobile: keep the booking action within reach. */}

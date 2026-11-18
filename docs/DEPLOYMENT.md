@@ -75,7 +75,7 @@ When it does start, production settings:
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS`, `DEFAULT_FROM_EMAIL` | yes | SMTP from your email provider; set up SPF/DKIM for the sender domain |
 | `DJANGO_ADMIN_URL` | no | A less guessable admin path (ends with `/`) |
 | `REQUIRE_VERIFIED_EMAIL` | no | Default `true` in production |
-| `PLATFORM_CURRENCY`, `PLATFORM_FEE_BPS`, `BOOKING_HOLD_MINUTES`, `MENTOR_RESPONSE_HOURS`, `FREE_CANCELLATION_HOURS` | no | Marketplace rules |
+| `PLATFORM_CURRENCY`, `PLATFORM_FEE_BPS`, `MIN_SESSION_PRICE_CENTS` (default 100), `BOOKING_HOLD_MINUTES`, `MENTOR_RESPONSE_HOURS`, `FREE_CANCELLATION_HOURS` | no | Marketplace rules |
 | `MAX_PENDING_BOOKINGS_PER_STUDENT` / `_PER_MENTOR_PAIR` | no | Defaults 5 / 2 |
 | `PAYMENT_PROVIDER`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | no | Leave empty until payments are approved (PAYMENTS.md §9). Live keys make payments real |
 | `DB_STATEMENT_TIMEOUT_MS` | no | Default 30000; `0` for a long one-off command |

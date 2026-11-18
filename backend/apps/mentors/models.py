@@ -146,8 +146,19 @@ class MentorExperience(UUIDModel, TimeStampedModel):
         ]
 
 
+class SessionFormat(models.TextChoices):
+    ONLINE = "online", "Online"
+    IN_PERSON = "in_person", "In person"
+
+
 class MentorService(UUIDModel, TimeStampedModel):
-    """A bookable offering. Bookings snapshot title/duration/price, so edits never change past bookings."""
+    """
+    A bookable offering. Bookings snapshot title/duration/price, so edits never change past bookings.
+
+    A service is offered online, in person, or both. An in-person session costs
+    `price_cents + in_person_extra_cents`; `in_person_area` is the public, general area (never an
+    exact address: the meeting place is shared per booking once it's confirmed).
+    """
 
     mentor = models.ForeignKey(MentorProfile, on_delete=models.CASCADE, related_name="services")
     title = models.CharField(max_length=120)
@@ -156,10 +167,18 @@ class MentorService(UUIDModel, TimeStampedModel):
     price_cents = models.PositiveIntegerField()
     currency = models.CharField(max_length=3)
     is_active = models.BooleanField(default=True)
+    online = models.BooleanField(default=True)
+    in_person = models.BooleanField(default=False)
+    in_person_extra_cents = models.PositiveIntegerField(default=0)
+    in_person_area = models.CharField(max_length=120, blank=True)
 
     class Meta:
         ordering = ["price_cents", "duration_minutes"]
         constraints = [
+            models.CheckConstraint(condition=Q(online=True) | Q(in_person=True), name="service_has_format"),
+            models.CheckConstraint(
+                condition=Q(in_person_extra_cents__lte=MAX_PRICE_CENTS), name="service_in_person_extra_range"
+            ),
             models.CheckConstraint(
                 condition=Q(duration_minutes__in=ALLOWED_DURATIONS), name="service_duration_allowed"
             ),
@@ -170,6 +189,13 @@ class MentorService(UUIDModel, TimeStampedModel):
 
     def __str__(self) -> str:
         return self.title
+
+    def price_for(self, session_format: str) -> int:
+        extra = self.in_person_extra_cents if session_format == SessionFormat.IN_PERSON else 0
+        return self.price_cents + extra
+
+    def offers(self, session_format: str) -> bool:
+        return self.in_person if session_format == SessionFormat.IN_PERSON else self.online
 
 
 class AvailabilityRule(UUIDModel, TimeStampedModel):

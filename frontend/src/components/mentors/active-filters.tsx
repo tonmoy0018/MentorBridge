@@ -41,6 +41,10 @@ export function ActiveFilters({ params, taxonomy }: { params: MentorSearchParams
     chips.push({ label: `Available ${label.toLowerCase()}`, href: without({ available_within: undefined }) });
   }
 
+  if (params.in_person) {
+    chips.push({ label: "Meets in person", href: without({ in_person: undefined }) });
+  }
+
   if (chips.length === 0) return null;
 
   return (

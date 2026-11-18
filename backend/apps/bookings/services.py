@@ -15,7 +15,7 @@ from django.utils import timezone
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 
 from apps.common.exceptions import Conflict, DomainError, ServiceUnavailable
-from apps.mentors.models import MentorProfile, MentorService
+from apps.mentors.models import MentorProfile, MentorService, SessionFormat
 from apps.mentors.selectors import bookable_slots
 
 from . import notifications
@@ -60,23 +60,47 @@ def _constraint_name(exc: IntegrityError) -> str | None:
 # --- creation ---------------------------------------------------------------------------
 
 
-def create_booking(*, student, service_id, start_at: datetime, student_note: str = "", now=None) -> Booking:
+def create_booking(
+    *,
+    student,
+    service_id,
+    start_at: datetime,
+    student_note: str = "",
+    session_format: str | None = None,
+    package_purchase_id=None,
+    now=None,
+) -> Booking:
     """
     Book `service_id` at `start_at` for `student`. The price, duration and title come from the
-    service on the server — never from the client.
+    service on the server — never from the client. With `package_purchase_id`, the session is paid
+    for by the student's package: its format and length come from the package, and the price is 0.
     """
     now = now or timezone.now()
     service = MentorService.objects.select_related("mentor__user").filter(pk=service_id).first()
     if service is None or not service.mentor.is_publicly_visible:
         raise NotFound("Service not found.")
     mentor = service.mentor
-    if not service.is_active:
+    # A package keeps working if the mentor later hides the service it was sold for.
+    if not service.is_active and package_purchase_id is None:
         raise Conflict("service_unavailable", "This service is no longer offered.")
     if not mentor.is_accepting_bookings:
         raise Conflict("not_accepting_bookings", "This mentor isn't accepting new bookings right now.")
     if settings.REQUIRE_VERIFIED_EMAIL and not student.email_verified:
         raise DomainError("email_not_verified", "Verify your email address before booking.", status_code=403)
-    if service.price_cents > 0 and not settings.PAYMENTS_ENABLED:
+
+    if package_purchase_id is None:
+        session_format = session_format or (
+            SessionFormat.ONLINE if service.online else SessionFormat.IN_PERSON
+        )
+        if not service.offers(session_format):
+            raise Conflict(
+                "format_unavailable",
+                f"This session isn't offered {SessionFormat(session_format).label.lower()}.",
+            )
+        price_cents, duration = service.price_for(session_format), service.duration_minutes
+    else:
+        price_cents = 0
+    if price_cents > 0 and not settings.PAYMENTS_ENABLED:
         # A hold could never be paid, so don't create one (it would also block the slot).
         raise ServiceUnavailable(
             "payments_unavailable", "Paid sessions can't be booked until online payment is available."
@@ -85,18 +109,27 @@ def create_booking(*, student, service_id, start_at: datetime, student_note: str
     start_at = start_at.astimezone(UTC)
     if start_at.second or start_at.microsecond:
         raise Conflict("slot_unavailable", "That time isn't one of the mentor's available slots.")
-    end_at = start_at + timedelta(minutes=service.duration_minutes)
-    blocked_until = end_at + timedelta(minutes=mentor.buffer_minutes)
 
     with transaction.atomic():
         # Serialise bookings for this mentor; concurrent requests wait here.
         MentorProfile.objects.select_for_update().get(pk=mentor.pk)
+        purchase = None
+        if package_purchase_id is not None:
+            from apps.packages.services import lock_for_booking
+
+            # Locks the purchase too, so two bookings can't both take its last session.
+            purchase = lock_for_booking(
+                student=student, purchase_id=package_purchase_id, service=service, start_at=start_at, now=now
+            )
+            session_format, duration = purchase.format, purchase.duration_minutes
+        end_at = start_at + timedelta(minutes=duration)
+        blocked_until = end_at + timedelta(minutes=mentor.buffer_minutes)
         expire_due(now=now, mentor=mentor, student=student)
         _check_pending_limits(student, mentor)
 
         slots = bookable_slots(
             mentor,
-            duration_minutes=service.duration_minutes,
+            duration_minutes=duration,
             window_start=start_at,
             window_end=start_at + timedelta(minutes=1),
             now=now,
@@ -104,18 +137,22 @@ def create_booking(*, student, service_id, start_at: datetime, student_note: str
         if start_at not in slots:
             raise Conflict("slot_unavailable", "That time is no longer available. Please choose another.")
 
-        if service.price_cents > 0:
+        if price_cents > 0:
             status = BookingStatus.PENDING_PAYMENT
         else:
             status = BookingStatus.CONFIRMED if mentor.auto_accept else BookingStatus.REQUESTED
+        in_person = session_format == SessionFormat.IN_PERSON
         booking = Booking(
             student=student,
             mentor=mentor,
             service=service,
             service_title=service.title,
-            duration_minutes=service.duration_minutes,
-            price_cents=service.price_cents,
+            duration_minutes=duration,
+            price_cents=price_cents,
             currency=service.currency,
+            format=session_format,
+            in_person_area=service.in_person_area if in_person else "",
+            package_purchase=purchase,
             start_at=start_at,
             end_at=end_at,
             blocked_until=blocked_until,
@@ -173,7 +210,9 @@ def _require_mentor(booking: Booking, actor) -> None:
 
 
 @transaction.atomic
-def accept_booking(booking: Booking, *, actor, now=None) -> Booking:
+def accept_booking(
+    booking: Booking, *, actor, meeting_place: str = "", meeting_url: str = "", now=None
+) -> Booking:
     now = now or timezone.now()
     booking = _lock(booking)
     _require_mentor(booking, actor)
@@ -193,9 +232,55 @@ def accept_booking(booking: Booking, *, actor, now=None) -> Booking:
         actor=actor,
         confirmed_at=now,
         respond_by=None,
-        meeting_url=booking.mentor.meeting_url,
+        # A link agreed for this session wins over the mentor's default one.
+        meeting_url=meeting_url.strip() or booking.meeting_url or booking.mentor.meeting_url,
+        **({"meeting_place": meeting_place.strip()} if meeting_place.strip() else {}),
     )
     notifications.confirmed(booking)
+    return booking
+
+
+@transaction.atomic
+def set_meeting_place(booking: Booking, *, actor, meeting_place: str) -> Booking:
+    """The mentor tells the student exactly where to meet for an in-person session."""
+    booking = _lock(booking)
+    _require_mentor(booking, actor)
+    if booking.format != SessionFormat.IN_PERSON:
+        raise Conflict("invalid_state", "Only in-person sessions have a meeting place.")
+    if booking.status not in (BookingStatus.REQUESTED, BookingStatus.CONFIRMED):
+        raise Conflict("invalid_state", "This session can't be changed any more.")
+    if len(meeting_place.strip()) < 3:
+        raise ValidationError({"meeting_place": ["Enter where you'll meet."]})
+    booking.meeting_place = meeting_place.strip()
+    booking.save(update_fields=["meeting_place", "updated_at"])
+    BookingEvent.objects.create(
+        booking=booking,
+        from_status=booking.status,
+        to_status=booking.status,
+        actor=actor,
+        note="Meeting place updated.",
+    )
+    return booking
+
+
+@transaction.atomic
+def set_meeting_link(booking: Booking, *, actor, meeting_url: str) -> Booking:
+    """The mentor sets the call link for one online session (any tool both of them agree on)."""
+    booking = _lock(booking)
+    _require_mentor(booking, actor)
+    if booking.format != SessionFormat.ONLINE or booking.seminar_id:
+        raise Conflict("invalid_state", "Only one-to-one online sessions have their own meeting link.")
+    if booking.status not in (BookingStatus.REQUESTED, BookingStatus.CONFIRMED):
+        raise Conflict("invalid_state", "This session can't be changed any more.")
+    booking.meeting_url = meeting_url.strip()
+    booking.save(update_fields=["meeting_url", "updated_at"])
+    BookingEvent.objects.create(
+        booking=booking,
+        from_status=booking.status,
+        to_status=booking.status,
+        actor=actor,
+        note="Meeting link updated.",
+    )
     return booking
 
 
@@ -206,7 +291,8 @@ def payment_authorized(booking: Booking, payment) -> Booking:
     """
     now = timezone.now()
     booking = _lock(booking)
-    if booking.mentor.auto_accept:
+    # Seminar seats need no mentor answer: the mentor published the seminar.
+    if booking.mentor.auto_accept or booking.seminar_id:
         from apps.payments.services import PaymentProviderError, capture_for_booking
 
         try:
@@ -217,7 +303,7 @@ def payment_authorized(booking: Booking, payment) -> Booking:
             booking = _transition(
                 booking,
                 BookingStatus.CONFIRMED,
-                note="Paid; auto-accepted.",
+                note="Paid; seminar seat confirmed." if booking.seminar_id else "Paid; auto-accepted.",
                 confirmed_at=now,
                 hold_expires_at=None,
                 meeting_url=booking.mentor.meeting_url,
@@ -268,7 +354,11 @@ def decline_booking(booking: Booking, *, actor, reason: str) -> Booking:
         note=reason,
         respond_by=None,
         cancellation_reason=reason.strip(),
-        refund_outcome=RefundOutcome.NOT_CHARGED if booking.price_cents else RefundOutcome.NOT_APPLICABLE,
+        refund_outcome=(
+            RefundOutcome.NOT_CHARGED
+            if booking.price_cents or booking.package_purchase_id
+            else RefundOutcome.NOT_APPLICABLE
+        ),
     )
     from apps.payments.services import refund_stranded_capture, release_for_booking
 
@@ -292,8 +382,11 @@ def complete_booking(booking: Booking, *, actor, now=None) -> Booking:
 
 
 def cancellation_outcome(booking: Booking, *, by_mentor: bool, now: datetime) -> str:
-    """Refund policy (docs/PRODUCT_REQUIREMENTS.md §6.3)."""
-    if booking.price_cents == 0:
+    """
+    Refund policy (docs/PRODUCT_REQUIREMENTS.md §6.3). For a session paid by a package the same
+    policy decides whether the package credit comes back (NO_REFUND = the session counts as used).
+    """
+    if booking.price_cents == 0 and booking.package_purchase_id is None:
         return RefundOutcome.NOT_APPLICABLE
     if booking.status in (BookingStatus.PENDING_PAYMENT, BookingStatus.REQUESTED):
         return RefundOutcome.NOT_CHARGED
@@ -317,6 +410,8 @@ def cancel_booking(booking: Booking, *, actor, reason: str = "", now=None) -> Bo
     if booking.start_at <= now:
         raise Conflict("invalid_state", "Sessions can't be cancelled after they've started.")
     if by_mentor:
+        if booking.seminar_id:
+            raise Conflict("invalid_state", "Cancel the whole seminar from your Services page instead.")
         if booking.status == BookingStatus.REQUESTED:
             raise Conflict("invalid_state", "Decline the request instead of cancelling it.")
         if not reason.strip():
@@ -350,7 +445,7 @@ def admin_cancel_booking(booking: Booking, *, actor, reason: str, refund: bool, 
     booking = _lock(booking)
     if not reason.strip():
         raise ValidationError({"reason": ["Record why the booking is being cancelled."]})
-    if booking.price_cents == 0:
+    if booking.price_cents == 0 and booking.package_purchase_id is None:
         outcome = RefundOutcome.NOT_APPLICABLE
     elif booking.status in (BookingStatus.PENDING_PAYMENT, BookingStatus.REQUESTED):
         outcome = RefundOutcome.NOT_CHARGED
@@ -420,3 +515,28 @@ def expire_due(*, now=None, mentor=None, student=None) -> int:
             if expire_booking(booking, note="Expired automatically.") is not None:
                 count += 1
     return count
+
+
+# --- admin access to exact locations -------------------------------------------------------
+
+
+def reveal_meeting_place(target, *, actor, reason: str, request=None) -> dict:
+    """
+    Break-glass access for administrators: the exact meeting place of an in-person booking or
+    seminar, in any status. Every look is audit-logged with the stated reason (never the place).
+    """
+    from apps.common.models import record_audit
+
+    reason = reason.strip()
+    if not reason:
+        raise ValidationError({"reason": ["Record why you need the exact location."]})
+    if target.format != SessionFormat.IN_PERSON:
+        raise Conflict("invalid_state", "This session is online; it has no meeting place.")
+    if isinstance(target, Booking) and target.seminar_id:
+        place, area = target.seminar.meeting_place, target.seminar.in_person_area
+    else:
+        place, area = target.meeting_place, target.in_person_area
+    record_audit(
+        actor, f"{target._meta.model_name}.meeting_place_viewed", target, {"reason": reason}, request
+    )
+    return {"format": target.format, "in_person_area": area, "meeting_place": place or None}

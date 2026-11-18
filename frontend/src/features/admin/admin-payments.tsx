@@ -135,6 +135,10 @@ export function AdminPayments() {
                       <TableCell className="whitespace-nowrap">{formatDate(p.created_at, user.timezone)}</TableCell>
                       <TableCell>
                         {p.student_display_name} → {p.mentor_display_name}
+                        <span className="block text-xs text-muted-foreground">
+                          {p.title}
+                          {p.package_purchase_id ? " · multi-session" : ""}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">

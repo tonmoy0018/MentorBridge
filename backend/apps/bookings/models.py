@@ -50,10 +50,11 @@ class RefundOutcome(models.TextChoices):
 
 class Booking(UUIDModel, TimeStampedModel):
     """
-    One session between a student and a mentor. Service details and price are snapshotted
-    at booking time. `blocked_until` = end + mentor buffer; PostgreSQL exclusion constraints
-    reject any overlap of active bookings for the same mentor (including buffer) or the same
-    student, regardless of application code.
+    One session between a student and a mentor, or one student's seat in a group seminar.
+    Service details and price are snapshotted at booking time. `blocked_until` = end + mentor
+    buffer; PostgreSQL exclusion constraints reject any overlap of active bookings for the same
+    mentor (including buffer, seminar seats excepted) or the same student, regardless of
+    application code.
     """
 
     student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="bookings")
@@ -72,6 +73,28 @@ class Booking(UUIDModel, TimeStampedModel):
     status = models.CharField(max_length=20, choices=BookingStatus.choices)
     student_note = models.TextField(max_length=1000, blank=True)
     meeting_url = models.URLField(max_length=300, blank=True)
+
+    format = models.CharField(max_length=10, default="online", help_text="mentors.SessionFormat")
+    # In person: the service's public area at booking time, and the exact place the mentor shares
+    # (only shown to the two participants, and only once the session is confirmed).
+    in_person_area = models.CharField(max_length=120, blank=True)
+    meeting_place = models.CharField(max_length=300, blank=True)
+    package_purchase = models.ForeignKey(
+        "packages.PackagePurchase",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="bookings",
+        help_text="Set when the session is paid for by a package (price is then 0).",
+    )
+    seminar = models.ForeignKey(
+        "seminars.Seminar",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="registrations",
+        help_text="Set when this booking is a seat in a group seminar.",
+    )
 
     hold_expires_at = models.DateTimeField(null=True, blank=True)
     respond_by = models.DateTimeField(null=True, blank=True)
@@ -93,13 +116,17 @@ class Booking(UUIDModel, TimeStampedModel):
                 condition=Q(blocked_until__gte=F("end_at")), name="booking_blocked_after_end"
             ),
             models.CheckConstraint(condition=Q(status__in=BookingStatus.values), name="booking_status_valid"),
+            models.CheckConstraint(
+                condition=Q(format__in=["online", "in_person"]), name="booking_format_valid"
+            ),
+            # Seminar seats share the seminar's time; the seminar itself blocks the mentor.
             ExclusionConstraint(
                 name="booking_no_mentor_overlap",
                 expressions=[
                     ("mentor", RangeOperators.EQUAL),
                     (TsTzRange("start_at", "blocked_until", RangeBoundary()), RangeOperators.OVERLAPS),
                 ],
-                condition=Q(status__in=ACTIVE_STATUSES),
+                condition=Q(status__in=ACTIVE_STATUSES, seminar__isnull=True),
             ),
             ExclusionConstraint(
                 name="booking_no_student_overlap",

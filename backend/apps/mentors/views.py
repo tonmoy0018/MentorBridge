@@ -14,6 +14,9 @@ from rest_framework.views import APIView
 from apps.common.permissions import IsAdminRole, IsMentor
 from apps.common.schema import AUTHED, E400, E404, E409, errors
 from apps.common.serializers import RequiredReasonSerializer
+from apps.packages.models import MentorPackage
+from apps.seminars.serializers import with_seats
+from apps.seminars.services import upcoming_public
 
 from . import selectors, services
 from .models import (
@@ -103,10 +106,18 @@ class MentorDetailView(APIView):
 
     def get(self, request, identifier):
         qs = selectors.public_mentors().prefetch_related(
-            "experiences", Prefetch("services", queryset=MentorService.objects.filter(is_active=True))
+            "experiences",
+            Prefetch("services", queryset=MentorService.objects.filter(is_active=True)),
+            Prefetch(
+                "packages", queryset=MentorPackage.objects.filter(is_active=True).select_related("service")
+            ),
         )
         mentor = selectors.get_public_mentor(identifier, qs)
-        context = {"request": request, "next_available": selectors.next_available_map([mentor])}
+        context = {
+            "request": request,
+            "next_available": selectors.next_available_map([mentor]),
+            "seminars": with_seats(upcoming_public([mentor.pk])),
+        }
         return Response(MentorPublicProfileSerializer(mentor, context=context).data)
 
 

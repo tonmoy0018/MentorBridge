@@ -7,6 +7,8 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.common.serializers import MoneySerializer, money
+from apps.packages.serializers import PackageSerializer
+from apps.seminars.serializers import SeminarSerializer
 from apps.taxonomy.models import Category, Language, Profession, Skill
 from apps.taxonomy.serializers import TaxonomyItemSerializer
 from apps.users.services import VALID_TIMEZONES
@@ -46,7 +48,10 @@ class ExperienceSerializer(serializers.ModelSerializer):
 
 
 class ServiceSerializer(serializers.ModelSerializer):
-    price = serializers.SerializerMethodField()
+    price = serializers.SerializerMethodField(help_text="Price of an online session.")
+    in_person_extra = serializers.SerializerMethodField(
+        help_text="Added to `price` for an in-person session."
+    )
 
     class Meta:
         model = MentorService
@@ -56,6 +61,10 @@ class ServiceSerializer(serializers.ModelSerializer):
             "description",
             "duration_minutes",
             "price",
+            "online",
+            "in_person",
+            "in_person_extra",
+            "in_person_area",
             "is_active",
             "created_at",
             "updated_at",
@@ -66,6 +75,10 @@ class ServiceSerializer(serializers.ModelSerializer):
     def get_price(self, obj):
         return money(obj.price_cents, obj.currency)
 
+    @extend_schema_field(MoneySerializer)
+    def get_in_person_extra(self, obj):
+        return money(obj.in_person_extra_cents, obj.currency)
+
 
 class ServiceWriteSerializer(serializers.Serializer):
     title = serializers.CharField(min_length=3, max_length=120)
@@ -74,6 +87,10 @@ class ServiceWriteSerializer(serializers.Serializer):
     price_cents = serializers.IntegerField(min_value=0, max_value=MAX_PRICE_CENTS)
     currency = serializers.CharField(min_length=3, max_length=3, required=False)
     is_active = serializers.BooleanField(default=True)
+    online = serializers.BooleanField(required=False)
+    in_person = serializers.BooleanField(required=False)
+    in_person_extra_cents = serializers.IntegerField(min_value=0, max_value=MAX_PRICE_CENTS, required=False)
+    in_person_area = serializers.CharField(max_length=120, required=False, allow_blank=True)
 
 
 class MentorSummarySerializer(serializers.ModelSerializer):
@@ -90,6 +107,7 @@ class MentorSummarySerializer(serializers.ModelSerializer):
     rating_avg = serializers.DecimalField(max_digits=3, decimal_places=2, allow_null=True)
     starting_price = serializers.SerializerMethodField()
     next_available_at = serializers.SerializerMethodField()
+    offers_in_person = serializers.SerializerMethodField(help_text="Has a service offered in person.")
 
     class Meta:
         model = MentorProfile
@@ -113,6 +131,7 @@ class MentorSummarySerializer(serializers.ModelSerializer):
             "rating_count",
             "starting_price",
             "next_available_at",
+            "offers_in_person",
         ]
         read_only_fields = fields
 
@@ -138,6 +157,9 @@ class MentorSummarySerializer(serializers.ModelSerializer):
         cents = getattr(obj, "min_price_cents", None)
         return None if cents is None else money(cents)
 
+    def get_offers_in_person(self, obj) -> bool:
+        return bool(getattr(obj, "offers_in_person", False))
+
     @extend_schema_field(OpenApiTypes.DATETIME)
     def get_next_available_at(self, obj):
         value = self.context.get("next_available", {}).get(obj.pk)
@@ -147,15 +169,34 @@ class MentorSummarySerializer(serializers.ModelSerializer):
 class MentorPublicProfileSerializer(MentorSummarySerializer):
     experiences = ExperienceSerializer(many=True)
     services = serializers.SerializerMethodField()
+    packages = serializers.SerializerMethodField()
+    seminars = serializers.SerializerMethodField(help_text="Upcoming group seminars with seats left.")
 
     class Meta(MentorSummarySerializer.Meta):
-        fields = [*MentorSummarySerializer.Meta.fields, "bio", "timezone", "experiences", "services"]
+        fields = [
+            *MentorSummarySerializer.Meta.fields,
+            "bio",
+            "timezone",
+            "experiences",
+            "services",
+            "packages",
+            "seminars",
+        ]
         read_only_fields = fields
 
     @extend_schema_field(ServiceSerializer(many=True))
     def get_services(self, obj):
         services = [s for s in obj.services.all() if s.is_active]
         return ServiceSerializer(services, many=True).data
+
+    @extend_schema_field(PackageSerializer(many=True))
+    def get_packages(self, obj):
+        packages = [p for p in obj.packages.all() if p.is_active and p.service.is_active]
+        return PackageSerializer(packages, many=True).data
+
+    @extend_schema_field(SeminarSerializer(many=True))
+    def get_seminars(self, obj):
+        return SeminarSerializer(self.context.get("seminars", []), many=True).data
 
 
 class MentorOwnProfileSerializer(serializers.ModelSerializer):
@@ -409,6 +450,7 @@ class MentorSearchQuerySerializer(serializers.Serializer):
     language = serializers.RegexField(r"^[a-z]{2,3}$", required=False)
     price_min = serializers.IntegerField(min_value=0, required=False, help_text="Cents")
     price_max = serializers.IntegerField(min_value=0, required=False, help_text="Cents")
+    in_person = serializers.BooleanField(required=False, help_text="Only mentors who meet in person.")
     available_within_days = serializers.IntegerField(min_value=1, max_value=60, required=False)
     ordering = serializers.ChoiceField(
         choices=["relevance", "min_price_cents", "-min_price_cents", "-rating_avg", "-years_experience"],

@@ -221,6 +221,130 @@ test.describe.serial("marketplace journey", () => {
     await expect(rivalPage.getByText("Awaiting mentor").first()).toBeVisible();
   });
 
+  test("M. packages and in-person sessions", async () => {
+    // The mentor adds a free in-person service and a free package from the dashboard.
+    await mentorPage.goto("/dashboard/mentor/services");
+    await mentorPage.getByRole("button", { name: "Add service" }).click();
+    let dialog = mentorPage.getByRole("dialog");
+    await dialog.getByLabel("Title").fill("Coffee meetup");
+    await dialog.getByLabel("What's included").fill("An informal chat over coffee.");
+    await dialog.getByLabel("Length").selectOption("30");
+    await dialog.getByLabel("Price (USD)").fill("0");
+    await dialog.getByLabel("In person (meet up)").check();
+    await dialog.getByLabel("Area you meet in").fill("Soho, London");
+    await dialog.getByRole("button", { name: "Save service" }).click();
+    await expect(mentorPage.getByText("In person in Soho, London")).toBeVisible();
+
+    const intro = mentorPage.getByRole("listitem").filter({ has: mentorPage.getByRole("heading", { name: "Intro chat" }) });
+    await intro.getByRole("button", { name: "Add option" }).click();
+    dialog = mentorPage.getByRole("dialog");
+    await dialog.getByLabel("Sessions").fill("2");
+    await dialog.getByLabel("Discount (%)").fill("0");
+    await dialog.getByLabel("Use within (days)").fill("30");
+    await dialog.getByRole("button", { name: "Save option" }).click();
+    await expectToast(mentorPage, "Option added");
+
+    // The student picks "2 sessions" in the booking panel, gets them, then books one.
+    const { slug } = await (await apiCall(mentorCtx, "GET", "/me/mentor/profile/")).json();
+    await studentPage.goto(`/mentors/${slug}`);
+    const panel = studentPage.locator("#book");
+    await panel.getByLabel("Service").selectOption({ label: "Intro chat · 30 min · Free" });
+    await panel.getByRole("radio", { name: /2 sessions/ }).check();
+    await panel.getByRole("button", { name: "Buy 2 sessions" }).click();
+    await studentPage.getByRole("alertdialog").getByRole("button", { name: "Get sessions" }).click();
+    await expect(panel.getByLabel("Pay with")).toContainText("2 × Intro chat (2 sessions left)");
+    await panel.getByRole("group", { name: /time/i }).getByRole("button").nth(2).click();
+    await panel.getByRole("button", { name: "Request booking" }).click();
+    dialog = studentPage.getByRole("alertdialog");
+    await expect(dialog.getByText("Included in 2 × Intro chat")).toBeVisible();
+    await dialog.getByRole("button", { name: "Send request" }).click();
+    await studentPage.waitForURL("**/dashboard/student/bookings");
+    const purchases = await (await apiCall(studentCtx, "GET", "/me/student/packages/")).json();
+    expect(purchases[0]).toMatchObject({ title: "2 × Intro chat", status: "active", sessions_remaining: 1 });
+
+    // An in-person session: the exact place is shared by the mentor when accepting.
+    await studentPage.goto(`/mentors/${slug}`);
+    await panel.getByLabel("Pay with").selectOption({ label: "Pay per session" });
+    await panel.getByLabel("Service").selectOption({ label: "Coffee meetup · 30 min · Free" });
+    await panel.getByRole("radio", { name: /In person/ }).check();
+    await panel.getByRole("group", { name: /time/i }).getByRole("button").nth(6).click();
+    await panel.getByRole("button", { name: "Request booking" }).click();
+    dialog = studentPage.getByRole("alertdialog");
+    await expect(dialog.getByText("In person · Soho, London")).toBeVisible();
+    await dialog.getByRole("button", { name: "Send request" }).click();
+    await studentPage.waitForURL("**/dashboard/student/bookings");
+
+    await mentorPage.goto("/dashboard/mentor/bookings");
+    const request = mentorPage.getByRole("tabpanel").getByRole("article").filter({ hasText: "Coffee meetup" });
+    await request.getByRole("button", { name: "Accept" }).click();
+    dialog = mentorPage.getByRole("alertdialog");
+    await dialog.getByLabel("Meeting place").fill("Bar Italia, 22 Frith St");
+    await dialog.getByRole("button", { name: "Accept request" }).click();
+    await expectToast(mentorPage, "Booking confirmed");
+
+    await studentPage.reload();
+    await expect(studentPage.getByText("Meet at: Bar Italia, 22 Frith St")).toBeVisible();
+
+    // Admins see the exact place only by giving a reason, which is audit-logged.
+    await adminPage.goto("/dashboard/admin/bookings?status=confirmed");
+    const row = adminPage.getByRole("row").filter({ hasText: "Coffee meetup" }).filter({ hasText: student.last });
+    await expect(row.getByText("Bar Italia")).toHaveCount(0);
+    await row.getByRole("button", { name: "Show exact location" }).click();
+    dialog = adminPage.getByRole("alertdialog");
+    await dialog.getByLabel("Why do you need it?").fill("E2E safety check");
+    await dialog.getByRole("button", { name: "Show location" }).click();
+    await expect(row.getByText("Bar Italia, 22 Frith St")).toBeVisible();
+    const audit = JSON.stringify(await (await apiCall(adminCtx, "GET", "/admin/audit-log/")).json());
+    expect(audit).toContain("booking.meeting_place_viewed");
+    expect(audit).not.toContain("Bar Italia");
+  });
+
+  test("N. group seminars: schedule, choose in the booking panel, fill, cancel", async () => {
+    // The mentor schedules a free two-seat seminar of "Intro chat", well clear of other bookings.
+    const day = new Date(Date.now() + 10 * 86_400_000);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const start = `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}T06:00`;
+    await mentorPage.goto("/dashboard/mentor/services");
+    await mentorPage.getByRole("button", { name: "Schedule seminar" }).click();
+    let dialog = mentorPage.getByRole("dialog");
+    await dialog.getByRole("combobox", { name: /^Session/ }).selectOption({ label: "Intro chat" });
+    await dialog.getByLabel("Title").fill("Breaking into product (group)");
+    await dialog.getByLabel("Date and time").fill(start);
+    await dialog.getByLabel("Seats").fill("2");
+    await dialog.getByLabel("Price per seat (USD)").fill("0");
+    await dialog.getByRole("button", { name: "Schedule seminar" }).click();
+    await expectToast(mentorPage, "Seminar scheduled");
+
+    // The student sees it on the profile and picks "Group seminar" in the booking panel.
+    const { slug } = await (await apiCall(mentorCtx, "GET", "/me/mentor/profile/")).json();
+    await studentPage.goto(`/mentors/${slug}`);
+    await expect(studentPage.getByRole("heading", { name: "Group seminars" })).toBeVisible();
+    const panel = studentPage.locator("#book");
+    await panel.getByLabel("Service").selectOption({ label: "Intro chat · 30 min · Free" });
+    await panel.getByRole("radio", { name: /Group seminar/ }).check();
+    await expect(panel.getByText("2 seats left")).toBeVisible();
+    await panel.getByRole("button", { name: "Register" }).click();
+    await studentPage.getByRole("alertdialog").getByRole("button", { name: "Register" }).click();
+    await studentPage.waitForURL("**/dashboard/student/bookings");
+    await expect(studentPage.getByText("Group seminar with").first()).toBeVisible();
+
+    // A second student takes the last seat; the mentor sees who's coming.
+    const [seminar] = await (await apiCall(mentorCtx, "GET", "/me/mentor/seminars/")).json();
+    expect((await apiCall(rivalCtx, "POST", `/seminars/${seminar.id}/register/`)).status()).toBe(201);
+    await mentorPage.reload();
+    await expect(mentorPage.getByText("2 of 2 seats taken")).toBeVisible();
+
+    // Cancelling the seminar cancels every seat.
+    await mentorPage.getByRole("button", { name: "Cancel seminar" }).click();
+    dialog = mentorPage.getByRole("alertdialog");
+    await dialog.getByLabel("Message to students").fill("Sorry, I have to travel that week.");
+    await dialog.getByRole("button", { name: "Cancel seminar" }).click();
+    await expectToast(mentorPage, "Seminar cancelled");
+    const mine = await (await apiCall(studentCtx, "GET", "/bookings/?scope=past")).json();
+    const seat = mine.results.find((b: { seminar: { id: string } | null }) => b.seminar?.id === seminar.id);
+    expect(seat).toMatchObject({ status: "cancelled", cancellation_reason: "Sorry, I have to travel that week." });
+  });
+
   test("L. protected data and pages stay protected", async ({ browser }) => {
     // Other users' bookings are invisible.
     expect((await apiCall(rivalCtx, "GET", `/bookings/${bookingId}/`)).status()).toBe(404);

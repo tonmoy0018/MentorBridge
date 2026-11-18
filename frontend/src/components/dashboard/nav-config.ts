@@ -6,6 +6,7 @@ import {
   CreditCard,
   Flag,
   Heart,
+  Layers,
   LayoutDashboard,
   Mail,
   MessageSquareText,
@@ -30,6 +31,7 @@ export const DASHBOARD_NAV: Record<Role, NavItem[]> = {
   student: [
     { href: "/dashboard/student", label: "Overview", icon: LayoutDashboard },
     { href: "/dashboard/student/bookings", label: "Bookings", icon: CalendarDays },
+    { href: "/dashboard/student/packages", label: "Packages", icon: Layers },
     { href: "/dashboard/student/saved-mentors", label: "Saved mentors", icon: Heart },
     { href: "/dashboard/student/goals", label: "Goals", icon: Target },
     { href: "/dashboard/student/settings", label: "Settings", icon: Settings },

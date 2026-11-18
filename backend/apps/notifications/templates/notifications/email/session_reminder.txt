@@ -5,5 +5,6 @@ This is a reminder of your upcoming session.
 Service: {{ service_title }}
 With: {{ other_name }}
 When: {{ when }}
+Format: {{ format_label }}
 
-Join from your bookings page: {{ site_url }}/dashboard
+{% if in_person %}The meeting place is on your bookings page:{% else %}Join from your bookings page:{% endif %} {{ site_url }}/dashboard

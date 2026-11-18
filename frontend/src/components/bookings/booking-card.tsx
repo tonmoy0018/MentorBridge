@@ -1,4 +1,4 @@
-import { CalendarDays, Clock, ExternalLink, MessageSquareText } from "lucide-react";
+import { CalendarDays, Clock, ExternalLink, MapPin, MessageSquareText } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { Booking, RefundOutcome } from "@/lib/api/types";
@@ -12,6 +12,12 @@ const REFUND_TEXT: Record<Exclude<RefundOutcome, "">, string> = {
   not_charged: "Cancelled before payment was taken: no charge.",
   full_refund: "A full refund is due under the cancellation policy.",
   no_refund: "Cancelled less than 24 hours before the session: no refund under the policy.",
+};
+
+const PACKAGE_REFUND_TEXT: Record<Exclude<RefundOutcome, "">, string> = {
+  not_charged: "The session went back to the package.",
+  full_refund: "The session went back to the package.",
+  no_refund: "Cancelled less than 24 hours before the session: it counts as used from the package.",
 };
 
 /**
@@ -45,7 +51,7 @@ export function BookingCard({
             <p className="truncate text-sm text-muted-foreground">
               {perspective === "student" ? (
                 <>
-                  with{" "}
+                  {booking.seminar ? "Group seminar with " : "with "}
                   <Link href={ROUTES.mentor(booking.mentor.slug)} className="underline-offset-4 hover:underline">
                     {booking.mentor.display_name}
                   </Link>
@@ -78,9 +84,35 @@ export function BookingCard({
         </div>
         <div className="flex items-center gap-2">
           <dt className="sr-only">Price</dt>
-          <dd className="font-medium">{formatMoney(booking.price)}</dd>
+          <dd className="font-medium">
+            {booking.package ? <span title={booking.package.title}>From package</span> : formatMoney(booking.price)}
+          </dd>
         </div>
       </dl>
+
+      {booking.format === "in_person" ? (
+        <p className="mt-3 flex gap-2 text-sm">
+          <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <span>
+            In person
+            {booking.in_person_area ? ` in ${booking.in_person_area}` : ""}
+            {booking.meeting_place ? (
+              <>
+                {" · "}
+                <span className="font-medium">Meet at: {booking.meeting_place}</span>
+              </>
+            ) : booking.status === "confirmed" || booking.status === "requested" ? (
+              <span className="text-muted-foreground">
+                {perspective === "mentor"
+                  ? " · Add the exact meeting place so the student knows where to go."
+                  : booking.status === "confirmed"
+                    ? " · Your mentor will add the exact meeting place here."
+                    : " · The exact place is shared once the mentor confirms."}
+              </span>
+            ) : null}
+          </span>
+        </p>
+      ) : null}
 
       {booking.student_note ? (
         <p className="mt-4 flex gap-2 rounded-lg bg-muted/60 p-3 text-sm">
@@ -98,7 +130,7 @@ export function BookingCard({
           payment isn&apos;t confirmed by then, the hold expires.
         </p>
       ) : null}
-      {booking.status === "confirmed" && !booking.meeting_url ? (
+      {booking.status === "confirmed" && booking.format === "online" && !booking.meeting_url ? (
         <p className="mt-3 text-sm text-muted-foreground">
           {perspective === "mentor"
             ? "Add a default meeting link in your profile so the student can join."
@@ -113,7 +145,9 @@ export function BookingCard({
         </p>
       ) : null}
       {booking.status === "cancelled" && booking.refund_outcome ? (
-        <p className="mt-3 text-sm text-muted-foreground">{REFUND_TEXT[booking.refund_outcome]}</p>
+        <p className="mt-3 text-sm text-muted-foreground">
+          {(booking.package ? PACKAGE_REFUND_TEXT : REFUND_TEXT)[booking.refund_outcome]}
+        </p>
       ) : null}
       {booking.status === "completed" && booking.has_review && perspective === "student" ? (
         <p className="mt-3 text-sm text-muted-foreground">You reviewed this session. Thank you!</p>
@@ -128,9 +162,9 @@ export function BookingCard({
         <p className="mt-3 text-sm text-muted-foreground">Reason: {booking.cancellation_reason}</p>
       ) : null}
 
-      {(booking.status === "confirmed" && booking.meeting_url) || actions ? (
+      {(booking.status === "confirmed" && booking.format === "online" && booking.meeting_url) || actions ? (
         <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
-          {booking.status === "confirmed" && booking.meeting_url ? (
+          {booking.status === "confirmed" && booking.format === "online" && booking.meeting_url ? (
             <a
               href={booking.meeting_url}
               target="_blank"

@@ -70,7 +70,7 @@ async function Directory({ searchParams }: { searchParams: Promise<RawSearchPara
 
   return (
     <>
-      <SearchBar defaultValue={params.q} hiddenParams={{ ...params, q: undefined, page: undefined }} className="mt-6 max-w-2xl" />
+      <SearchBar defaultValue={params.q} hiddenParams={{ ...params, in_person: params.in_person ? 1 : undefined, q: undefined, page: undefined }} className="mt-6 max-w-2xl" />
 
       <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[17rem_1fr]">
         <aside aria-label="Filters" className="hidden lg:block">
@@ -112,7 +112,7 @@ async function Directory({ searchParams }: { searchParams: Promise<RawSearchPara
               }
             />
           ) : (
-            <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
               {results.results.map((mentor) => (
                 <li key={mentor.id}>
                   <MentorCard mentor={mentor} />
@@ -141,7 +141,7 @@ function DirectorySkeleton() {
         <Skeleton className="hidden h-[32rem] rounded-xl lg:block" />
         <div>
           <Skeleton className="h-6 w-40" />
-          <CardListSkeleton count={6} className="mt-6 sm:grid-cols-2 xl:grid-cols-3" label="Loading mentors…" />
+          <CardListSkeleton count={6} className="mt-6 sm:grid-cols-2 2xl:grid-cols-3" label="Loading mentors…" />
         </div>
       </div>
     </div>

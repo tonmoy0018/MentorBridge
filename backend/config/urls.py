@@ -13,10 +13,16 @@ from apps.mentors.urls import me_urlpatterns as mentor_me
 from apps.mentors.urls import public_urlpatterns as mentor_public
 from apps.moderation.urls import admin_urlpatterns as moderation_admin
 from apps.notifications.views import AdminNotificationListView
+from apps.packages.urls import me_mentor_urlpatterns as package_mentor_me
+from apps.packages.urls import me_student_urlpatterns as package_student_me
+from apps.packages.urls import public_urlpatterns as package_public
 from apps.payments.urls import admin_urlpatterns as payment_admin
 from apps.payments.urls import me_urlpatterns as payment_me
 from apps.payments.urls import webhook_urlpatterns
 from apps.reviews.views import AdminReviewHideView, AdminReviewListView, AdminReviewPublishView
+from apps.seminars.urls import admin_urlpatterns as seminar_admin
+from apps.seminars.urls import me_mentor_urlpatterns as seminar_mentor_me
+from apps.seminars.urls import public_urlpatterns as seminar_public
 from apps.taxonomy.urls import category_urlpatterns, taxonomy_urlpatterns
 from apps.users.admin_urls import urlpatterns as user_admin
 
@@ -32,6 +38,7 @@ admin_api = [
     *booking_admin,
     *payment_admin,
     *moderation_admin,
+    *seminar_admin,
 ]
 
 api_v1 = [
@@ -41,8 +48,10 @@ api_v1 = [
     path("categories/", include(category_urlpatterns)),
     path("taxonomy/", include(taxonomy_urlpatterns)),
     path("mentors/", include(mentor_public)),
-    path("me/mentor/", include([*mentor_me, *payment_me])),
-    path("me/student/", include("apps.students.urls")),
+    path("me/mentor/", include([*mentor_me, *payment_me, *package_mentor_me, *seminar_mentor_me])),
+    path("me/student/", include([*package_student_me, path("", include("apps.students.urls"))])),
+    path("packages/", include(package_public)),
+    path("seminars/", include(seminar_public)),
     path("bookings/", include("apps.bookings.urls")),
     path("reports/", include("apps.moderation.urls")),
     path("payments/", include(webhook_urlpatterns)),

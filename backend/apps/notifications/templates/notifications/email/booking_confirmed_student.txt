@@ -1,12 +1,14 @@
 Hi {{ first_name }},
 
-Your session is confirmed.
+{% if seminar %}Your seat in the group seminar is confirmed.{% else %}Your session is confirmed.{% endif %}
 
 Service: {{ service_title }}
 With: {{ mentor_name }}
 When: {{ when }}
-{% if price %}Price: {{ price }}
+Format: {{ format_label }}
+{% if package_title %}Paid with package: {{ package_title }}
+{% endif %}{% if price %}Price: {{ price }}
 {% endif %}
-The meeting link is in your bookings: {{ site_url }}/dashboard/student/bookings
+{% if in_person %}The meeting place is{% else %}The meeting link is{% endif %} in your bookings: {{ site_url }}/dashboard/student/bookings
 
 You can cancel from the same page. {% if paid %}Cancellations at least {{ free_cancellation_hours }} hours before the session are refunded in full.{% endif %}

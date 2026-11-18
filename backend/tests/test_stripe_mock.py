@@ -35,6 +35,8 @@ def payment():
     return SimpleNamespace(
         pk=uuid.uuid4(),
         booking=booking,
+        booking_id=booking.pk,
+        package_purchase_id=None,
         amount_cents=5000,
         currency="USD",
         provider_reference="pi_123",
@@ -45,7 +47,7 @@ def payment():
 def test_checkout_request_is_valid(provider, payment):
     session = provider.create_checkout(
         payment=payment,
-        booking=payment.booking,
+        title=payment.booking.service_title,
         success_url="https://example.test/ok",
         cancel_url="https://example.test/cancel",
         expires_at=datetime.now(UTC) + timedelta(minutes=31),

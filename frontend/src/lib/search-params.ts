@@ -56,6 +56,7 @@ export function parseMentorSearchParams(raw: RawSearchParams): MentorSearchParam
     price_min: priceMin,
     price_max: priceMax,
     available_within: availableWithin && availableWithin > 0 ? availableWithin : undefined,
+    in_person: first(raw.in_person) === "1" ? true : undefined,
     sort: sort && SORTS.has(sort) && sort !== "relevance" ? sort : undefined,
     page: page && page > 1 ? page : undefined,
   };
@@ -73,6 +74,7 @@ export function toSearchQuery(params: MentorSearchParams): string {
     ["price_min", params.price_min],
     ["price_max", params.price_max],
     ["available_within", params.available_within],
+    ["in_person", params.in_person ? 1 : undefined],
     ["sort", params.sort === "relevance" ? undefined : params.sort],
     ["page", params.page && params.page > 1 ? params.page : undefined],
   ];
@@ -97,5 +99,6 @@ export function countActiveFilters(params: MentorSearchParams): number {
     params.price_min,
     params.price_max,
     params.available_within,
+    params.in_person,
   ].filter((v) => v !== undefined).length;
 }
