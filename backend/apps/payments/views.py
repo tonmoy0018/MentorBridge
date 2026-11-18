@@ -122,9 +122,12 @@ class AdminPaymentListView(generics.ListAPIView):
     serializer_class = AdminPaymentSerializer
 
     def get_queryset(self):
-        qs = Payment.objects.select_related("booking__student", "booking__mentor__user").prefetch_related(
-            "refunds"
-        )
+        qs = Payment.objects.select_related(
+            "booking__student",
+            "booking__mentor__user",
+            "package_purchase__student",
+            "package_purchase__mentor__user",
+        ).prefetch_related("refunds")
         params = self.request.query_params
         if (value := params.get("status")) in PaymentStatus.values:
             qs = qs.filter(status=value)
@@ -139,7 +142,12 @@ class AdminPaymentListView(generics.ListAPIView):
 class AdminPaymentDetailView(generics.RetrieveAPIView):
     permission_classes = [IsAdminRole]
     serializer_class = AdminPaymentSerializer
-    queryset = Payment.objects.select_related("booking__student", "booking__mentor__user")
+    queryset = Payment.objects.select_related(
+        "booking__student",
+        "booking__mentor__user",
+        "package_purchase__student",
+        "package_purchase__mentor__user",
+    )
 
 
 class AdminPaymentRefundView(APIView):

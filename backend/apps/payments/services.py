@@ -127,7 +127,7 @@ def start_checkout(booking, *, student) -> Payment:
         try:
             session = provider.create_checkout(
                 payment=payment,
-                booking=booking,
+                title=booking.service_title,
                 success_url=f"{return_base}?checkout={booking.pk}",
                 cancel_url=f"{return_base}?checkout={booking.pk}&cancelled=1",
                 expires_at=expires_at,
@@ -142,6 +142,62 @@ def start_checkout(booking, *, student) -> Payment:
         if booking.hold_expires_at is None or session.expires_at > booking.hold_expires_at:
             booking.hold_expires_at = session.expires_at
             booking.save(update_fields=["hold_expires_at", "updated_at"])
+        return payment
+
+
+def start_checkout_for_purchase(purchase, *, student) -> Payment:
+    """Create (or reuse) the checkout for a bundle awaiting payment. Charged as soon as it's authorised."""
+    from apps.packages.models import PackagePurchase, PurchaseStatus
+
+    if not settings.PAYMENTS_ENABLED:
+        raise DomainError("payments_unavailable", "Online payment isn't available yet.", status_code=503)
+    now = timezone.now()
+    with transaction.atomic():
+        purchase = PackagePurchase.objects.select_for_update().select_related("mentor").get(pk=purchase.pk)
+        if purchase.student_id != student.pk:
+            raise Conflict("invalid_state", "This purchase isn't yours.")
+        if purchase.status != PurchaseStatus.PENDING_PAYMENT or purchase.price_cents == 0:
+            raise Conflict("invalid_state", "This purchase isn't awaiting payment.")
+        existing = purchase.payments.filter(status__in=[PaymentStatus.CREATED, PaymentStatus.FAILED]).first()
+        if (
+            existing
+            and existing.checkout_url
+            and existing.checkout_expires_at
+            and existing.checkout_expires_at > now
+        ):
+            return existing  # repeated clicks reuse the same checkout
+        if purchase.payments.filter(status__in=[PaymentStatus.AUTHORIZED, PaymentStatus.CAPTURED]).exists():
+            raise Conflict("already_paid", "This purchase has already been paid.")
+        if existing:
+            _set_status(existing, PaymentStatus.CANCELLED, failure_code="checkout_replaced")
+
+        split = commission.breakdown(purchase.price_cents, commission.commission_bps_for(purchase.mentor))
+        provider = _provider()
+        payment = Payment.objects.create(
+            package_purchase=purchase,
+            provider=provider.name,
+            livemode=provider.livemode,
+            amount_cents=split.gross_cents,
+            currency=purchase.currency,
+            commission_bps=split.commission_bps,
+            platform_fee_cents=split.commission_cents,
+            mentor_share_cents=split.mentor_share_cents,
+        )
+        return_base = f"{settings.FRONTEND_URL}/dashboard/student/packages"
+        try:
+            session = provider.create_checkout(
+                payment=payment,
+                title=purchase.title,
+                success_url=f"{return_base}?checkout={purchase.pk}",
+                cancel_url=f"{return_base}?checkout={purchase.pk}&cancelled=1",
+                expires_at=now + timedelta(minutes=settings.CHECKOUT_MIN_MINUTES),
+            )
+        except ProviderError as exc:
+            raise PaymentProviderError() from exc
+        payment.checkout_reference = session.reference
+        payment.checkout_url = session.url
+        payment.checkout_expires_at = session.expires_at
+        payment.save()
         return payment
 
 
@@ -176,7 +232,12 @@ def process_webhook(body: bytes, headers) -> str:
 
 
 def _find_payment(event: ProviderEvent) -> Payment | None:
-    qs = Payment.objects.select_for_update().select_related("booking__mentor__user", "booking__student")
+    qs = Payment.objects.select_for_update(of=("self",)).select_related(
+        "booking__mentor__user",
+        "booking__student",
+        "package_purchase__mentor__user",
+        "package_purchase__student",
+    )
     if event.payment_id:
         try:
             payment = qs.filter(pk=event.payment_id).first()
@@ -239,6 +300,11 @@ def _on_checkout_expired(payment, event, provider) -> str:
     changed = _set_status(
         payment, PaymentStatus.CANCELLED, failure_code=payment.failure_code or "checkout_expired"
     )
+    if payment.package_purchase_id:
+        from apps.packages.services import close_unpaid
+
+        close_unpaid(payment.package_purchase)
+        return "checkout_expired" if changed else "noop"
     if payment.booking.status == BookingStatus.PENDING_PAYMENT:
         expire_booking(payment.booking, note="Checkout expired without payment.")
     return "checkout_expired" if changed else "noop"
@@ -261,6 +327,8 @@ def _on_authorized(payment, event, provider) -> str:
         return "amount_mismatch_released"
     if not _set_status(payment, PaymentStatus.AUTHORIZED, authorized_at=timezone.now(), failure_code=""):
         return "noop"
+    if payment.package_purchase_id:
+        return _purchase_authorized(payment, provider)
     booking = payment.booking
     if booking.status != BookingStatus.PENDING_PAYMENT:
         # Paid too late (hold expired, booking cancelled): never charge for a slot we can't honour.
@@ -271,6 +339,27 @@ def _on_authorized(payment, event, provider) -> str:
     return "authorized"
 
 
+def _purchase_authorized(payment, provider) -> str:
+    """A bundle needs no one's answer: charge it now, then make it usable."""
+    from apps.packages.models import PurchaseStatus
+
+    purchase = payment.package_purchase
+    if purchase.status != PurchaseStatus.PENDING_PAYMENT:
+        # Paid on a checkout we'd given up on: never charge for it.
+        _release(payment, provider, failure_code="purchase_unavailable")
+        _notify_payment(payment, "payment_released", key=f"payment.released:{payment.pk}")
+        return "released_late_payment"
+    try:
+        _capture(payment, provider)
+    except PaymentProviderError:
+        logger.warning("Capture failed for bundle payment %s; it stays authorised", payment.pk)
+        return "authorized_capture_failed"
+    from apps.packages.services import activate_after_payment
+
+    activate_after_payment(purchase)
+    return "captured_package_active"
+
+
 def _on_captured(payment, event, provider) -> str:
     if not _amount_matches(payment, event):
         logger.error("Payment %s captured amount mismatch", payment.pk)
@@ -278,6 +367,18 @@ def _on_captured(payment, event, provider) -> str:
     changed = _set_status(payment, PaymentStatus.CAPTURED, captured_at=payment.captured_at or timezone.now())
     if not changed:
         return "noop"
+    if payment.package_purchase_id:
+        from apps.packages.services import activate_after_payment
+
+        if activate_after_payment(payment.package_purchase):
+            return "captured_package_active"
+        transaction.on_commit(
+            lambda: create_refund(
+                payment, amount_cents=None, reason=RefundReason.SYSTEM, note="Captured for a closed purchase."
+            ),
+            robust=True,
+        )
+        return "captured_refunding"
     # We only capture when a mentor accepts. Reaching here means our own record of that capture
     # was lost (e.g. the accept transaction rolled back after the provider call succeeded).
     from apps.bookings.models import BookingStatus
@@ -310,6 +411,12 @@ def _on_cancelled(payment, event, provider) -> str:
     from apps.bookings.services import expire_booking
 
     changed = _set_status(payment, PaymentStatus.CANCELLED, failure_code=payment.failure_code or "cancelled")
+    if payment.package_purchase_id:
+        from apps.packages.services import close_unpaid
+
+        if changed:
+            close_unpaid(payment.package_purchase)
+        return "cancelled" if changed else "noop"
     booking = payment.booking
     # An authorisation that lapses (≈7 days) or is cancelled before capture ends the request.
     if changed and booking.status in (BookingStatus.PENDING_PAYMENT, BookingStatus.REQUESTED):
@@ -393,8 +500,12 @@ def capture_for_booking(booking) -> Payment | None:
         if already is not None:
             return already
         raise Conflict("payment_required", "This booking has no authorised payment to capture.")
+    return _capture(payment, _provider())
+
+
+def _capture(payment: Payment, provider) -> Payment:
     try:
-        result = _provider().capture(payment)
+        result = provider.capture(payment)
     except ProviderError as exc:
         payment.failure_code = exc.code[:100]
         payment.save(update_fields=["failure_code", "updated_at"])
@@ -536,6 +647,13 @@ def _finish_refund(refund: Refund, *, succeeded: bool, failure_code: str = "", n
         payment.refunded_amount_cents += refund.amount_cents
         payment.save(update_fields=["refunded_amount_cents", "updated_at"])
     _refresh_refund_status(payment)
+    if succeeded and payment.package_purchase_id and payment.refund_status == RefundStatus.FULL:
+        from apps.packages.models import PackagePurchase, PurchaseStatus
+
+        # Fully refunded: no further sessions can be booked from it (booked ones are left to admins).
+        PackagePurchase.objects.filter(pk=payment.package_purchase_id).update(
+            status=PurchaseStatus.REFUNDED, updated_at=timezone.now()
+        )
     if notify:
         template = "refund_succeeded" if succeeded else "refund_failed"
         _notify_payment(
@@ -595,14 +713,18 @@ def _notify_payment(payment: Payment, template: str, *, key: str, amount_cents: 
     from apps.common.serializers import money
     from apps.notifications.services import local_time, notify
 
-    booking = payment.booking
-    student = booking.student
+    subject = payment.subject
+    student = subject.student
     amount = money(amount_cents if amount_cents is not None else payment.amount_cents, payment.currency)
+    booking = payment.booking
     context = {
-        "service_title": booking.service_title,
-        "mentor_name": booking.mentor.user.full_name,
-        "when": local_time(booking.start_at, student),
-        "hold_until": local_time(booking.hold_expires_at, student) if booking.hold_expires_at else "",
+        "service_title": payment.title,
+        "mentor_name": subject.mentor.user.full_name,
+        "package": booking is None,
+        "when": local_time(booking.start_at, student) if booking else "",
+        "hold_until": local_time(booking.hold_expires_at, student)
+        if booking and booking.hold_expires_at
+        else "",
         "amount": f"{amount['amount_cents'] / 100:,.2f} {amount['currency']}",
     }
     notify(template, student, context, dedupe_key=key)

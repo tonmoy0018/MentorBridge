@@ -60,7 +60,8 @@ PAYMENT_TRANSITIONS: dict[str, frozenset[str]] = {
 
 class Payment(UUIDModel, TimeStampedModel):
     """
-    One checkout for one booking, with its accounting breakdown:
+    One checkout for one booking or one session-bundle purchase (exactly one of the two), with its
+    accounting breakdown:
 
         amount_cents (gross) = platform_fee_cents (commission) + mentor_share_cents
 
@@ -70,7 +71,12 @@ class Payment(UUIDModel, TimeStampedModel):
     mentor share proportionally.
     """
 
-    booking = models.ForeignKey("bookings.Booking", on_delete=models.PROTECT, related_name="payments")
+    booking = models.ForeignKey(
+        "bookings.Booking", null=True, blank=True, on_delete=models.PROTECT, related_name="payments"
+    )
+    package_purchase = models.ForeignKey(
+        "packages.PackagePurchase", null=True, blank=True, on_delete=models.PROTECT, related_name="payments"
+    )
     provider = models.CharField(max_length=20)
     livemode = models.BooleanField(
         default=False, help_text="False for provider test/sandbox mode. Test payments are never revenue."
@@ -127,11 +133,38 @@ class Payment(UUIDModel, TimeStampedModel):
                 condition=Q(status__in=OPEN_PAYMENT_STATUSES),
                 name="one_open_payment_per_booking",
             ),
+            models.UniqueConstraint(
+                fields=["package_purchase"],
+                condition=Q(status__in=OPEN_PAYMENT_STATUSES),
+                name="one_open_payment_per_purchase",
+            ),
+            models.CheckConstraint(
+                condition=Q(booking__isnull=False, package_purchase__isnull=True)
+                | Q(booking__isnull=True, package_purchase__isnull=False),
+                name="payment_for_booking_or_purchase",
+            ),
         ]
         indexes = [models.Index(fields=["status", "livemode"])]
 
     def __str__(self) -> str:
         return f"{self.provider}:{self.provider_reference or self.pk} {self.status}"
+
+    @property
+    def subject(self):
+        """What was paid for: the booking or the bundle purchase."""
+        return self.booking if self.booking_id else self.package_purchase
+
+    @property
+    def mentor(self):
+        return self.subject.mentor
+
+    @property
+    def student(self):
+        return self.subject.student
+
+    @property
+    def title(self) -> str:
+        return self.booking.service_title if self.booking_id else self.package_purchase.title
 
 
 class RefundReason(models.TextChoices):

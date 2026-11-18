@@ -22,6 +22,9 @@ makemigrations:
 superuser:     ## Create an administrator account
 	$(COMPOSE) run --rm -it backend python manage.py createsuperuser
 
+demo:          ## Create fictional demo accounts for showing the app (local only; prints the password)
+	$(RUN) python manage.py seed_demo
+
 shell:
 	$(COMPOSE) run --rm -it backend python manage.py shell
 

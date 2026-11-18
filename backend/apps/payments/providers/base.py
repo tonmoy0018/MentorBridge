@@ -76,8 +76,10 @@ class PaymentProvider(Protocol):
     livemode: bool
 
     def create_checkout(
-        self, *, payment, booking, success_url: str, cancel_url: str, expires_at: datetime
-    ) -> CheckoutSession: ...
+        self, *, payment, title: str, success_url: str, cancel_url: str, expires_at: datetime
+    ) -> CheckoutSession:
+        """`payment.subject` is the booking or bundle purchase being paid for; `title` names it."""
+        ...
 
     def expire_checkout(self, payment) -> None: ...
 

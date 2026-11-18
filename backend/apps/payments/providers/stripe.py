@@ -67,8 +67,10 @@ class StripeProvider:
             logger.warning("Stripe API error: %s", code)
             raise ProviderError(str(code)) from exc
 
-    def create_checkout(self, *, payment, booking, success_url, cancel_url, expires_at) -> CheckoutSession:
-        metadata = {"payment_id": str(payment.pk), "booking_id": str(booking.pk)}
+    def create_checkout(self, *, payment, title, success_url, cancel_url, expires_at) -> CheckoutSession:
+        kind = "booking" if payment.booking_id else "purchase"
+        subject_id = str(payment.booking_id or payment.package_purchase_id)
+        metadata = {"payment_id": str(payment.pk), f"{kind}_id": subject_id}
         session = self._call(
             self._client.v1.checkout.sessions.create,
             params={
@@ -79,17 +81,17 @@ class StripeProvider:
                         "price_data": {
                             "currency": payment.currency.lower(),
                             "unit_amount": payment.amount_cents,
-                            "product_data": {"name": booking.service_title[:250]},
+                            "product_data": {"name": title[:250]},
                         },
                     }
                 ],
                 "payment_intent_data": {
                     "capture_method": "manual",
                     "metadata": metadata,
-                    "description": f"MentorBridge booking {booking.pk}",
+                    "description": f"MentorBridge {kind} {subject_id}",
                 },
                 "metadata": metadata,
-                "client_reference_id": str(booking.pk),
+                "client_reference_id": subject_id,
                 "success_url": success_url,
                 "cancel_url": cancel_url,
                 "expires_at": int(expires_at.timestamp()),

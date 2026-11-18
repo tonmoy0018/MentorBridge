@@ -128,6 +128,8 @@ export interface MentorSummary {
   starting_price: Money | null;
   /** Earliest bookable slot (UTC ISO), null if nothing open in the booking horizon. */
   next_available_at: string | null;
+  /** Has at least one service offered in person. */
+  offers_in_person: boolean;
 }
 
 export type ExperienceKind = "work" | "education";
@@ -143,13 +145,95 @@ export interface MentorExperience {
   description: string;
 }
 
+export type SessionFormat = "online" | "in_person";
+
 export interface MentorService {
   id: string;
   title: string;
   description: string;
   duration_minutes: number;
+  /** Price of an online session. */
   price: Money;
+  online: boolean;
+  in_person: boolean;
+  /** Added to `price` for an in-person session. */
+  in_person_extra: Money;
+  /** Public, general area for in-person sessions (never an exact address). */
+  in_person_area: string;
   is_active: boolean;
+}
+
+/** Prices of a multi-session option for each format; null where the service isn't offered so. */
+export interface FormatPrices {
+  online: Money | null;
+  in_person: Money | null;
+}
+
+/** A multi-session option of a service ("4 sessions, 10% off"). */
+export interface MentorPackage {
+  id: string;
+  /** e.g. "4 × Career chat" */
+  title: string;
+  session_count: number;
+  discount_percent: number;
+  validity_days: number;
+  prices: FormatPrices;
+  /** The same sessions booked one by one. */
+  regular_prices: FormatPrices;
+  service: { id: string; title: string; duration_minutes: number };
+  is_active: boolean;
+}
+
+/** A group seminar as the public sees it (no attendees, no exact meeting place). */
+export interface Seminar {
+  id: string;
+  title: string;
+  description: string;
+  service: { id: string; title: string };
+  start_at: string;
+  end_at: string;
+  duration_minutes: number;
+  capacity: number;
+  seats_left: number;
+  /** Per seat. */
+  price: Money;
+  format: SessionFormat;
+  in_person_area: string;
+}
+
+export type SeminarStatus = "scheduled" | "completed" | "cancelled";
+
+/** The mentor's own view of a seminar. */
+export interface MentorSeminar extends Seminar {
+  seats_taken: number;
+  meeting_place: string;
+  meeting_url: string;
+  status: SeminarStatus;
+  cancellation_reason: string;
+  attendees: { booking_id: string; display_name: string; status: BookingStatus }[];
+}
+
+/** Admin-only, audited: the exact place of an in-person booking or seminar. */
+export interface MeetingPlaceReveal {
+  format: SessionFormat;
+  in_person_area: string;
+  /** Null if the mentor hasn't set one yet. */
+  meeting_place: string | null;
+}
+
+export interface SeminarInput {
+  service_id: string;
+  title: string;
+  description: string;
+  /** UTC ISO 8601. */
+  start_at: string;
+  duration_minutes: ServiceDuration;
+  capacity: number;
+  price_cents: number;
+  format: SessionFormat;
+  in_person_area: string;
+  meeting_place: string;
+  meeting_url: string;
 }
 
 export interface MentorProfile extends MentorSummary {
@@ -158,6 +242,10 @@ export interface MentorProfile extends MentorSummary {
   experiences: MentorExperience[];
   /** Active services only. */
   services: MentorService[];
+  /** Active packages only. */
+  packages: MentorPackage[];
+  /** Upcoming group seminars. */
+  seminars: Seminar[];
 }
 
 export interface Review {
@@ -190,6 +278,8 @@ export interface MentorSearchParams {
   price_max?: number;
   /** Only mentors with an open slot within this many days. */
   available_within?: number;
+  /** Only mentors who meet in person. */
+  in_person?: boolean;
   sort?: MentorSort;
   page?: number;
   page_size?: number;
@@ -226,6 +316,15 @@ export interface Booking {
   student_note: string;
   /** Only present once the booking is confirmed. */
   meeting_url: string | null;
+  format: SessionFormat;
+  /** In person: the general area, from the service. */
+  in_person_area: string;
+  /** In person: where exactly to meet. For the student, only once confirmed. */
+  meeting_place: string | null;
+  /** Set when the session is paid for by a package. */
+  package: { id: string; title: string } | null;
+  /** Set when this booking is a seat in a group seminar. */
+  seminar: { id: string; title: string } | null;
   mentor: BookingParty & { slug: string; headline: string };
   student: BookingParty;
   hold_expires_at: string | null;
@@ -250,6 +349,30 @@ export interface CreateBookingInput {
   service_id: string;
   start_at: string;
   student_note: string;
+  format?: SessionFormat;
+  package_purchase_id?: string;
+}
+
+export type PurchaseStatus = "pending_payment" | "active" | "cancelled" | "refunded";
+
+/** A student's package, with its remaining sessions. */
+export interface PackagePurchase {
+  id: string;
+  title: string;
+  format: SessionFormat;
+  /** Usable only when `active` (paid bundles become active once payment is confirmed). */
+  status: PurchaseStatus;
+  session_count: number;
+  sessions_used: number;
+  sessions_remaining: number;
+  duration_minutes: number;
+  price: Money;
+  /** Set once the bundle is active. */
+  expires_at: string | null;
+  is_expired: boolean;
+  mentor: BookingParty & { slug: string; headline: string };
+  service_id: string;
+  created_at: string;
 }
 
 export interface ReviewInput {
@@ -344,6 +467,24 @@ export interface ServiceInput {
   duration_minutes: ServiceDuration;
   price_cents: number;
   is_active: boolean;
+  online: boolean;
+  in_person: boolean;
+  in_person_extra_cents: number;
+  in_person_area: string;
+}
+
+export interface PackageInput {
+  service_id: string;
+  session_count: number;
+  discount_percent: number;
+  validity_days: number;
+  is_active: boolean;
+}
+
+export interface PurchaseResult {
+  purchase: PackagePurchase;
+  /** Where to pay; null if the bundle needed no payment. */
+  checkout_url: string | null;
 }
 
 export interface AvailabilityRule {
@@ -469,7 +610,11 @@ export type DisputeStatus = "none" | "open" | "won" | "lost";
 /** Written only from provider data (verified webhooks / API responses); read-only here. */
 export interface PaymentRecord {
   id: string;
-  booking_id: string;
+  /** Exactly one of these is set: a session booking or a multi-session bundle. */
+  booking_id: string | null;
+  package_purchase_id: string | null;
+  /** What was paid for. */
+  title: string;
   student_display_name: string;
   mentor_display_name: string;
   amount: Money;
@@ -497,7 +642,8 @@ export type RefundReason = "student_cancellation" | "mentor_cancellation" | "adm
 export interface RefundRecord {
   id: string;
   payment_id: string;
-  booking_id: string;
+  /** Null for a bundle payment. */
+  booking_id: string | null;
   amount: Money;
   commission_reversed: Money;
   mentor_share_reversed: Money;
@@ -600,6 +746,8 @@ export interface PublicConfig {
   /** True only with live provider keys. False means sandbox: no real money moves. */
   payments_livemode: boolean;
   currency: string;
+  /** Lowest price a mentor can set for a session or seminar seat. */
+  min_session_price: Money;
   booking_hold_minutes: number;
   mentor_response_hours: number;
   free_cancellation_hours: number;

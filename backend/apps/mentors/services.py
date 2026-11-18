@@ -14,9 +14,11 @@ from apps.common.models import record_audit
 from apps.notifications.services import notify
 
 from .models import (
+    MAX_PRICE_CENTS,
     AvailabilityRule,
     MentorProfile,
     MentorService,
+    SessionFormat,
     VerificationRequest,
     VerificationRequestStatus,
     VerificationStatus,
@@ -83,25 +85,59 @@ def _check_currency(currency: str | None) -> str:
     return currency
 
 
+def check_min_price(price_cents: int, field: str = "price_cents") -> None:
+    minimum = settings.MIN_SESSION_PRICE_CENTS
+    if price_cents < minimum:
+        raise ValidationError(
+            {field: f"Set a price of at least {minimum / 100:,.2f} {settings.PLATFORM_CURRENCY}."}
+        )
+
+
+def _check_formats(service: MentorService) -> None:
+    check_min_price(service.price_cents)
+    if not (service.online or service.in_person):
+        raise ValidationError({"online": "Offer the service online, in person, or both."})
+    if service.in_person:
+        service.in_person_area = service.in_person_area.strip()
+        if len(service.in_person_area) < 3:
+            raise ValidationError(
+                {"in_person_area": "Say where you meet in person, e.g. a neighbourhood or city."}
+            )
+    if service.price_for(SessionFormat.IN_PERSON) > MAX_PRICE_CENTS:
+        raise ValidationError({"in_person_extra_cents": "The in-person price is too high."})
+
+
 def create_service(mentor: MentorProfile, data: dict) -> MentorService:
-    return MentorService.objects.create(
-        mentor=mentor, currency=_check_currency(data.pop("currency", None)), **data
-    )
+    service = MentorService(mentor=mentor, currency=_check_currency(data.pop("currency", None)), **data)
+    _check_formats(service)
+    service.save()
+    return service
 
 
 def update_service(service: MentorService, data: dict) -> MentorService:
     if "currency" in data:
         service.currency = _check_currency(data.pop("currency"))
+    if (
+        "duration_minutes" in data
+        and data["duration_minutes"] != service.duration_minutes
+        and service.packages.exists()
+    ):
+        raise ValidationError(
+            {"duration_minutes": "Packages use this service's length. Create a new service instead."}
+        )
     for field, value in data.items():
         setattr(service, field, value)
+    _check_formats(service)
     service.save()
     return service
 
 
 def delete_service(service: MentorService) -> None:
-    """Services with bookings are kept for history; deactivate them instead."""
-    if service.bookings.exists():
-        raise Conflict("service_in_use", "This service has bookings. Hide it instead of deleting it.")
+    """Services with bookings or packages are kept for history; deactivate them instead."""
+    if service.bookings.exists() or service.packages.exists():
+        raise Conflict(
+            "service_in_use", "This service has bookings or packages. Hide it instead of deleting it."
+        )
     service.delete()
 
 

@@ -40,6 +40,7 @@ def test_public_config(api, db):
         "payments_enabled": False,
         "payments_livemode": False,
         "currency": "USD",
+        "min_session_price": {"amount_cents": 0, "currency": "USD"},  # test settings; default is 100
         "booking_hold_minutes": 30,
         "mentor_response_hours": 48,
         "free_cancellation_hours": 24,

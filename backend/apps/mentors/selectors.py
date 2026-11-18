@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from django.conf import settings
-from django.db.models import F, Min, OuterRef, Q, QuerySet, Subquery
+from django.db.models import Case, Exists, F, Min, OuterRef, Q, QuerySet, Subquery, When
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
@@ -34,17 +34,25 @@ AVAILABILITY_FILTER_CANDIDATE_LIMIT = 500
 
 
 def public_mentors() -> QuerySet[MentorProfile]:
+    active = MentorService.objects.filter(mentor=OuterRef("pk"), is_active=True)
+    # Lowest price a student can book: online, or in person (with the extra) where only that's offered.
     min_price = (
-        MentorService.objects.filter(mentor=OuterRef("pk"), is_active=True)
-        .values("mentor")
-        .annotate(m=Min("price_cents"))
+        active.values("mentor")
+        .annotate(
+            m=Min(
+                Case(
+                    When(online=True, then=F("price_cents")),
+                    default=F("price_cents") + F("in_person_extra_cents"),
+                )
+            )
+        )
         .values("m")
     )
     return (
         MentorProfile.objects.filter(verification_status=VerificationStatus.APPROVED, user__is_active=True)
         .select_related("user", "profession")
         .prefetch_related("categories", "skills", "languages")
-        .annotate(min_price_cents=Subquery(min_price))
+        .annotate(min_price_cents=Subquery(min_price), offers_in_person=Exists(active.filter(in_person=True)))
     )
 
 
@@ -84,6 +92,8 @@ def search_mentors(params: dict) -> QuerySet[MentorProfile]:
         qs = qs.filter(country=country)
     if language := params.get("language"):
         qs = qs.filter(languages__code=language)
+    if params.get("in_person"):
+        qs = qs.filter(offers_in_person=True)
     if (price_min := params.get("price_min")) is not None:
         qs = qs.filter(min_price_cents__gte=price_min)
     if (price_max := params.get("price_max")) is not None:
@@ -109,11 +119,23 @@ def _busy_intervals(mentor_ids, window_start: datetime, window_end: datetime, no
         )
         # A lapsed payment hold no longer blocks the slot (it's expired by the scheduler).
         .exclude(status=BookingStatus.PENDING_PAYMENT, hold_expires_at__lt=now)
+        .filter(seminar__isnull=True)  # seats are covered by their seminar below
         .values_list("mentor_id", "start_at", "blocked_until")
     )
     busy: dict = {}
     for mentor_id, start, blocked_until in rows:
         busy.setdefault(mentor_id, []).append(Interval(start, blocked_until))
+    # Scheduled group seminars block the mentor too (plus their buffer).
+    from apps.seminars.models import Seminar, SeminarStatus
+
+    seminars = Seminar.objects.filter(
+        mentor_id__in=mentor_ids,
+        status=SeminarStatus.SCHEDULED,
+        end_at__gt=window_start - LOOKAROUND,
+        start_at__lt=window_end,
+    ).values_list("mentor_id", "start_at", "end_at", "mentor__buffer_minutes")
+    for mentor_id, start, end, buffer in seminars:
+        busy.setdefault(mentor_id, []).append(Interval(start, end + timedelta(minutes=buffer)))
     return busy
 
 

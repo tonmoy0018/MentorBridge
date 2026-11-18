@@ -16,9 +16,20 @@ def _price(booking: Booking) -> str:
     return f"{booking.price_cents / 100:,.2f} {booking.currency}"
 
 
+def _format_label(booking: Booking) -> str:
+    if booking.format == "in_person":
+        return f"In person ({booking.in_person_area})" if booking.in_person_area else "In person"
+    return "Online"
+
+
 def _base(booking: Booking, recipient) -> dict:
+    # The exact meeting place is deliberately left out: emails and their logs carry only the area.
     return {
         "service_title": booking.service_title,
+        "format_label": _format_label(booking),
+        "in_person": booking.format == "in_person",
+        "package_title": booking.package_purchase.title if booking.package_purchase_id else "",
+        "seminar": bool(booking.seminar_id),
         "mentor_name": booking.mentor.user.full_name,
         "student_name": booking.student.full_name,
         "when": local_time(booking.start_at, recipient),
@@ -46,6 +57,8 @@ def confirmed(booking: Booking) -> None:
         _base(booking, student),
         dedupe_key=f"booking.confirmed:{booking.pk}:student",
     )
+    if booking.seminar_id:
+        return  # mentors follow seminar seats on the seminar's attendee list, not by email
     notify(
         "booking_confirmed_mentor",
         mentor_user,
@@ -72,6 +85,16 @@ REFUND_TEXT = {
     RefundOutcome.NOT_APPLICABLE: "",
 }
 
+# Sessions paid for by a package: the "refund" is the package credit.
+PACKAGE_REFUND_TEXT = {
+    RefundOutcome.FULL_REFUND: "The session has been returned to your package.",
+    RefundOutcome.NOT_CHARGED: "The session has been returned to your package.",
+    RefundOutcome.NO_REFUND: (
+        "This cancellation was inside the free-cancellation window before the session, "
+        "so the session counts as used from your package."
+    ),
+}
+
 
 def cancelled(booking: Booking, *, actor) -> None:
     """Tell the participants who didn't cancel (both, if an admin cancelled)."""
@@ -88,9 +111,25 @@ def cancelled(booking: Booking, *, actor) -> None:
             **_base(booking, user),
             "cancelled_by": cancelled_by,
             "reason": booking.cancellation_reason,
-            "refund_text": REFUND_TEXT.get(booking.refund_outcome, "") if role == "student" else "",
+            "refund_text": _refund_text(booking) if role == "student" else "",
         }
         notify("booking_cancelled", user, context, dedupe_key=f"booking.cancelled:{booking.pk}:{role}")
+
+
+def seminar_cancelled(booking: Booking) -> None:
+    """One email per seat when a whole seminar is cancelled."""
+    student = booking.student
+    context = {
+        **_base(booking, student),
+        "reason": booking.cancellation_reason,
+        "refund_text": _refund_text(booking),
+    }
+    notify("seminar_cancelled", student, context, dedupe_key=f"booking.seminar_cancelled:{booking.pk}")
+
+
+def _refund_text(booking: Booking) -> str:
+    texts = PACKAGE_REFUND_TEXT if booking.package_purchase_id else REFUND_TEXT
+    return texts.get(booking.refund_outcome, "")
 
 
 def expired(booking: Booking) -> None:

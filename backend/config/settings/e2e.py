@@ -11,3 +11,6 @@ REST_FRAMEWORK = {
     **REST_FRAMEWORK,
     "DEFAULT_THROTTLE_RATES": dict.fromkeys(REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"], "1000/min"),
 }
+
+# The browser suite runs with payments off, so its sessions must be free.
+MIN_SESSION_PRICE_CENTS = 0

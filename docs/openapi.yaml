@@ -218,6 +218,68 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Conflicts with the current state (e.g. `slot_unavailable`,
             `invalid_state`).
+  /api/v1/admin/bookings/{id}/meeting-place/:
+    post:
+      operationId: admin_bookings_meeting_place_create
+      description: For safety and incident handling. Works in any status. A reason
+        is required and every request is recorded in the audit log (the place itself
+        is not logged).
+      summary: Reveal the exact meeting place of an in-person booking
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequiredReasonRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeetingPlaceReveal'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation error (`validation_error`); field errors in `details.fields`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not logged in (`not_authenticated`).
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Wrong role or CSRF failure (`permission_denied`, `csrf_failed`).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found, or not visible to you (`not_found`).
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Conflicts with the current state (e.g. `slot_unavailable`,
+            `invalid_state`).
   /api/v1/admin/notifications/:
     get:
       operationId: admin_notifications_list
@@ -734,6 +796,155 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Not found, or not visible to you (`not_found`).
+  /api/v1/admin/seminars/:
+    get:
+      operationId: admin_seminars_list
+      summary: Upcoming group seminars
+      tags:
+      - Admin
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminSeminar'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not logged in (`not_authenticated`).
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Wrong role or CSRF failure (`permission_denied`, `csrf_failed`).
+  /api/v1/admin/seminars/{id}/cancel/:
+    post:
+      operationId: admin_seminars_cancel_create
+      summary: Cancel any group seminar
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequiredReasonRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Seminar'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation error (`validation_error`); field errors in `details.fields`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not logged in (`not_authenticated`).
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Wrong role or CSRF failure (`permission_denied`, `csrf_failed`).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found, or not visible to you (`not_found`).
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Conflicts with the current state (e.g. `slot_unavailable`,
+            `invalid_state`).
+  /api/v1/admin/seminars/{id}/meeting-place/:
+    post:
+      operationId: admin_seminars_meeting_place_create
+      description: For safety and incident handling. A reason is required and every
+        request is recorded in the audit log (the place itself is not logged).
+      summary: Reveal the exact place of an in-person seminar
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequiredReasonRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeetingPlaceReveal'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation error (`validation_error`); field errors in `details.fields`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not logged in (`not_authenticated`).
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Wrong role or CSRF failure (`permission_denied`, `csrf_failed`).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found, or not visible to you (`not_found`).
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Conflicts with the current state (e.g. `slot_unavailable`,
+            `invalid_state`).
   /api/v1/admin/stats/:
     get:
       operationId: admin_stats_retrieve
@@ -1542,6 +1753,8 @@ paths:
 
         * Free services → `requested` (or `confirmed` if the mentor auto-accepts).
         * Paid services → `pending_payment`, held for `BOOKING_HOLD_MINUTES`. It only advances when the payment provider confirms payment server-side (not yet available: holds expire).
+        * `format=in_person` adds the service's in-person extra to the price.
+        * `package_purchase_id` → paid by the package (price 0), in the package's format.
       summary: Book a session
       tags:
       - Bookings
@@ -1650,6 +1863,11 @@ paths:
         required: true
       tags:
       - Bookings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcceptBookingRequest'
       security:
       - sessionAuth: []
       responses:
@@ -1659,6 +1877,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/BookingDetail'
           description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation error (`validation_error`); field errors in `details.fields`.
         '401':
           content:
             application/json:
@@ -1864,6 +2088,128 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/RequiredReasonRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingDetail'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation error (`validation_error`); field errors in `details.fields`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not logged in (`not_authenticated`).
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Wrong role or CSRF failure (`permission_denied`, `csrf_failed`).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found, or not visible to you (`not_found`).
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Conflicts with the current state (e.g. `slot_unavailable`,
+            `invalid_state`).
+  /api/v1/bookings/{id}/meeting-link/:
+    post:
+      operationId: bookings_meeting_link_create
+      description: Use any video tool you and the student agree on. Shown to the student
+        once confirmed.
+      summary: Set the call link for an online session (mentor)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Bookings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MeetingLinkRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingDetail'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation error (`validation_error`); field errors in `details.fields`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not logged in (`not_authenticated`).
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Wrong role or CSRF failure (`permission_denied`, `csrf_failed`).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found, or not visible to you (`not_found`).
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Conflicts with the current state (e.g. `slot_unavailable`,
+            `invalid_state`).
+  /api/v1/bookings/{id}/meeting-place/:
+    post:
+      operationId: bookings_meeting_place_create
+      description: Shown to the student once the session is confirmed. Never included
+        in emails.
+      summary: Set where to meet for an in-person session (mentor)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Bookings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MeetingPlaceRequest'
         required: true
       security:
       - sessionAuth: []
@@ -2342,6 +2688,157 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/me/mentor/packages/:
+    get:
+      operationId: me_mentor_packages_list
+      summary: List my session packages (including hidden ones)
+      tags:
+      - Mentor self-service
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Package'
+          description: ''
+    post:
+      operationId: me_mentor_packages_create
+      description: N sessions of one of your services at a package price, used within
+        `validity_days`.
+      summary: Create a session package
+      tags:
+      - Mentor self-service
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PackageWriteRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Package'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation error (`validation_error`); field errors in `details.fields`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not logged in (`not_authenticated`).
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Wrong role or CSRF failure (`permission_denied`, `csrf_failed`).
+  /api/v1/me/mentor/packages/{id}/:
+    patch:
+      operationId: me_mentor_packages_partial_update
+      description: Changes apply to new purchases only.
+      summary: Update a session package
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Mentor self-service
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPackageWriteRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Package'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation error (`validation_error`); field errors in `details.fields`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not logged in (`not_authenticated`).
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Wrong role or CSRF failure (`permission_denied`, `csrf_failed`).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found, or not visible to you (`not_found`).
+    delete:
+      operationId: me_mentor_packages_destroy
+      summary: Delete a package nobody has bought
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Mentor self-service
+      security:
+      - sessionAuth: []
+      responses:
+        '204':
+          description: No response body
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not logged in (`not_authenticated`).
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Wrong role or CSRF failure (`permission_denied`, `csrf_failed`).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found, or not visible to you (`not_found`).
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Conflicts with the current state (e.g. `slot_unavailable`,
+            `invalid_state`).
   /api/v1/me/mentor/payouts/:
     get:
       operationId: me_mentor_payouts_list
@@ -2514,6 +3011,251 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Wrong role or CSRF failure (`permission_denied`, `csrf_failed`).
+  /api/v1/me/mentor/seminars/:
+    get:
+      operationId: me_mentor_seminars_list
+      summary: List my group seminars
+      tags:
+      - Mentor self-service
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MentorSeminar'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not logged in (`not_authenticated`).
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Wrong role or CSRF failure (`permission_denied`, `csrf_failed`).
+    post:
+      operationId: me_mentor_seminars_create
+      description: A fixed-time session of one of your services for several students.
+        The time must be free.
+      summary: Schedule a group seminar
+      tags:
+      - Mentor self-service
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SeminarWriteRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MentorSeminar'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation error (`validation_error`); field errors in `details.fields`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not logged in (`not_authenticated`).
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Wrong role or CSRF failure (`permission_denied`, `csrf_failed`).
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Conflicts with the current state (e.g. `slot_unavailable`,
+            `invalid_state`).
+  /api/v1/me/mentor/seminars/{id}/:
+    patch:
+      operationId: me_mentor_seminars_partial_update
+      description: Once students have registered, the time, length, price and format
+        can't change.
+      summary: Update a group seminar
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Mentor self-service
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSeminarWriteRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MentorSeminar'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation error (`validation_error`); field errors in `details.fields`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not logged in (`not_authenticated`).
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Wrong role or CSRF failure (`permission_denied`, `csrf_failed`).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found, or not visible to you (`not_found`).
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Conflicts with the current state (e.g. `slot_unavailable`,
+            `invalid_state`).
+  /api/v1/me/mentor/seminars/{id}/cancel/:
+    post:
+      operationId: me_mentor_seminars_cancel_create
+      description: Every seat is cancelled and refunded in full; each student gets
+        one email.
+      summary: Cancel a group seminar
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Mentor self-service
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequiredReasonRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MentorSeminar'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation error (`validation_error`); field errors in `details.fields`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not logged in (`not_authenticated`).
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Wrong role or CSRF failure (`permission_denied`, `csrf_failed`).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found, or not visible to you (`not_found`).
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Conflicts with the current state (e.g. `slot_unavailable`,
+            `invalid_state`).
+  /api/v1/me/mentor/seminars/{id}/complete/:
+    post:
+      operationId: me_mentor_seminars_complete_create
+      description: Confirmed seats become completed, so students can leave a review.
+      summary: Mark a group seminar as completed
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Mentor self-service
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MentorSeminar'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not logged in (`not_authenticated`).
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Wrong role or CSRF failure (`permission_denied`, `csrf_failed`).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found, or not visible to you (`not_found`).
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Conflicts with the current state (e.g. `slot_unavailable`,
+            `invalid_state`).
   /api/v1/me/mentor/services/:
     get:
       operationId: me_mentor_services_list
@@ -2900,6 +3642,83 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/me/student/packages/:
+    get:
+      operationId: me_student_packages_list
+      summary: List my session packages
+      parameters:
+      - in: query
+        name: mentor
+        schema:
+          type: string
+        description: Only packages with this mentor (id).
+      tags:
+      - Student self-service
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PackagePurchase'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not logged in (`not_authenticated`).
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Wrong role or CSRF failure (`permission_denied`, `csrf_failed`).
+  /api/v1/me/student/packages/{id}/:
+    get:
+      operationId: me_student_packages_retrieve
+      description: 'Poll this after checkout: `status` becomes `active` once payment
+        is confirmed.'
+      summary: Get one of my session packages
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Student self-service
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackagePurchase'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not logged in (`not_authenticated`).
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Wrong role or CSRF failure (`permission_denied`, `csrf_failed`).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found, or not visible to you (`not_found`).
   /api/v1/me/student/profile/:
     get:
       operationId: me_student_profile_retrieve
@@ -3056,6 +3875,11 @@ paths:
           type: string
           minLength: 1
           pattern: ^[A-Za-z]{2}$
+      - in: query
+        name: in_person
+        schema:
+          type: boolean
+        description: Only mentors who meet in person.
       - in: query
         name: industry
         schema:
@@ -3272,6 +4096,73 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Not found, or not visible to you (`not_found`).
+  /api/v1/packages/{id}/purchase/:
+    post:
+      operationId: packages_purchase_create
+      description: Starts (or resumes) checkout for the bundle in the chosen format.
+        The bundle stays `pending_payment` and can't be used until the payment provider
+        confirms payment; a browser redirect back from checkout changes nothing.
+      summary: Buy a multi-session option
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Packages
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseRequestRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation error (`validation_error`); field errors in `details.fields`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not logged in (`not_authenticated`).
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Wrong role or CSRF failure (`permission_denied`, `csrf_failed`).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found, or not visible to you (`not_found`).
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Conflicts with the current state (e.g. `slot_unavailable`,
+            `invalid_state`).
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Rate limited (`throttled`); see the Retry-After header.
   /api/v1/payments/webhooks/{provider}/:
     post:
       operationId: payments_webhooks_create
@@ -3327,6 +4218,62 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Validation error (`validation_error`); field errors in `details.fields`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not logged in (`not_authenticated`).
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Wrong role or CSRF failure (`permission_denied`, `csrf_failed`).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found, or not visible to you (`not_found`).
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Conflicts with the current state (e.g. `slot_unavailable`,
+            `invalid_state`).
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Rate limited (`throttled`); see the Retry-After header.
+  /api/v1/seminars/{id}/register/:
+    post:
+      operationId: seminars_register_create
+      description: 'Free seminars: the seat is confirmed at once. Paid seminars: the
+        seat is held (`pending_payment`) like a paid booking and confirmed when the
+        provider confirms payment.'
+      summary: Register for a group seminar
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Seminars
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingDetail'
+          description: ''
         '401':
           content:
             application/json:
@@ -3443,6 +4390,22 @@ paths:
           description: ''
 components:
   schemas:
+    AcceptBookingRequest:
+      type: object
+      properties:
+        meeting_place:
+          type: string
+          description: 'In-person sessions: where to meet.'
+          maxLength: 300
+        meeting_url:
+          description: 'Online sessions: the call link for this session. Defaults
+            to the mentor''s link.'
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 300
+          - type: string
+            maxLength: 0
     AdminCancelRequest:
       type: object
       properties:
@@ -3520,6 +4483,18 @@ components:
         booking_id:
           type: string
           format: uuid
+          readOnly: true
+          nullable: true
+        package_purchase_id:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+          description: Set when the payment is for a session bundle.
+        title:
+          type: string
+          readOnly: true
+          description: What was paid for.
         student_display_name:
           type: string
         mentor_display_name:
@@ -3603,6 +4578,7 @@ components:
       - livemode
       - mentor_display_name
       - mentor_share
+      - package_purchase_id
       - platform_fee
       - provider
       - provider_fee
@@ -3612,6 +4588,7 @@ components:
       - refunded
       - status
       - student_display_name
+      - title
     AdminRefundRequestRequest:
       type: object
       properties:
@@ -3729,6 +4706,92 @@ components:
       - rating
       - reviewer_name
       - status
+    AdminSeminar:
+      type: object
+      description: 'Admin list: everything but the exact place (revealed only through
+        the audited endpoint).'
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          readOnly: true
+        description:
+          type: string
+          readOnly: true
+        service:
+          allOf:
+          - $ref: '#/components/schemas/SeminarService'
+          readOnly: true
+        start_at:
+          type: string
+          format: date-time
+          readOnly: true
+        end_at:
+          type: string
+          format: date-time
+          readOnly: true
+        duration_minutes:
+          type: integer
+          readOnly: true
+        capacity:
+          type: integer
+          readOnly: true
+        seats_left:
+          type: integer
+          readOnly: true
+        price:
+          allOf:
+          - $ref: '#/components/schemas/Money'
+          readOnly: true
+          description: Per seat.
+        format:
+          allOf:
+          - $ref: '#/components/schemas/SessionFormatEnum'
+          readOnly: true
+        in_person_area:
+          type: string
+          readOnly: true
+        seats_taken:
+          type: integer
+          readOnly: true
+        meeting_url:
+          type: string
+          format: uri
+          readOnly: true
+          description: Defaults to the mentor's link.
+        status:
+          allOf:
+          - $ref: '#/components/schemas/SeminarStatusEnum'
+          readOnly: true
+        cancellation_reason:
+          type: string
+          readOnly: true
+        attendees:
+          type: array
+          items:
+            $ref: '#/components/schemas/SeminarAttendee'
+          readOnly: true
+      required:
+      - attendees
+      - cancellation_reason
+      - capacity
+      - description
+      - duration_minutes
+      - end_at
+      - format
+      - id
+      - in_person_area
+      - meeting_url
+      - price
+      - seats_left
+      - seats_taken
+      - service
+      - start_at
+      - status
+      - title
     AdminStats:
       type: object
       properties:
@@ -3970,6 +5033,27 @@ components:
           format: uri
           nullable: true
           readOnly: true
+        format:
+          allOf:
+          - $ref: '#/components/schemas/SessionFormatEnum'
+          readOnly: true
+        in_person_area:
+          type: string
+          readOnly: true
+        meeting_place:
+          type: string
+          nullable: true
+          readOnly: true
+        package:
+          allOf:
+          - $ref: '#/components/schemas/BookingPackage'
+          nullable: true
+          readOnly: true
+        seminar:
+          allOf:
+          - $ref: '#/components/schemas/BookingPackage'
+          nullable: true
+          readOnly: true
         mentor:
           allOf:
           - $ref: '#/components/schemas/BookingMentor'
@@ -4027,14 +5111,19 @@ components:
       - created_at
       - duration_minutes
       - end_at
+      - format
       - has_review
       - hold_expires_at
       - id
+      - in_person_area
+      - meeting_place
       - meeting_url
       - mentor
+      - package
       - price
       - refund_outcome
       - respond_by
+      - seminar
       - service_title
       - start_at
       - status
@@ -4077,6 +5166,27 @@ components:
         meeting_url:
           type: string
           format: uri
+          nullable: true
+          readOnly: true
+        format:
+          allOf:
+          - $ref: '#/components/schemas/SessionFormatEnum'
+          readOnly: true
+        in_person_area:
+          type: string
+          readOnly: true
+        meeting_place:
+          type: string
+          nullable: true
+          readOnly: true
+        package:
+          allOf:
+          - $ref: '#/components/schemas/BookingPackage'
+          nullable: true
+          readOnly: true
+        seminar:
+          allOf:
+          - $ref: '#/components/schemas/BookingPackage'
           nullable: true
           readOnly: true
         mentor:
@@ -4142,14 +5252,19 @@ components:
       - duration_minutes
       - end_at
       - events
+      - format
       - has_review
       - hold_expires_at
       - id
+      - in_person_area
+      - meeting_place
       - meeting_url
       - mentor
+      - package
       - price
       - refund_outcome
       - respond_by
+      - seminar
       - service_title
       - start_at
       - status
@@ -4198,6 +5313,17 @@ components:
       - headline
       - id
       - slug
+    BookingPackage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+      required:
+      - id
+      - title
     BookingParty:
       type: object
       properties:
@@ -4886,6 +6012,18 @@ components:
           type: string
           default: ''
           maxLength: 1000
+        format:
+          allOf:
+          - $ref: '#/components/schemas/SessionFormatEnum'
+          description: |-
+            Defaults to online when the service offers it. Ignored with a package.
+
+            * `online` - Online
+            * `in_person` - In person
+        package_purchase_id:
+          type: string
+          format: uuid
+          description: Use a session from one of your packages instead of paying.
       required:
       - service_id
       - start_at
@@ -5092,6 +6230,22 @@ components:
       - organization
       - start_date
       - title
+    FormatPrices:
+      type: object
+      properties:
+        online:
+          allOf:
+          - $ref: '#/components/schemas/Money'
+          nullable: true
+          description: Null if the session isn't offered online.
+        in_person:
+          allOf:
+          - $ref: '#/components/schemas/Money'
+          nullable: true
+          description: Null if the session isn't offered in person.
+      required:
+      - in_person
+      - online
     GoalStatusEnum:
       enum:
       - not_started
@@ -5183,6 +6337,40 @@ components:
       required:
       - email
       - password
+    MeetingLinkRequest:
+      type: object
+      properties:
+        meeting_url:
+          type: string
+          format: uri
+          minLength: 1
+          maxLength: 300
+      required:
+      - meeting_url
+    MeetingPlaceRequest:
+      type: object
+      properties:
+        meeting_place:
+          type: string
+          minLength: 1
+          maxLength: 300
+      required:
+      - meeting_place
+    MeetingPlaceReveal:
+      type: object
+      properties:
+        format:
+          $ref: '#/components/schemas/SessionFormatEnum'
+        in_person_area:
+          type: string
+        meeting_place:
+          type: string
+          nullable: true
+          description: Null if the mentor hasn't set one.
+      required:
+      - format
+      - in_person_area
+      - meeting_place
     MentorOwnProfile:
       type: object
       description: The authenticated mentor's full profile, including private settings.
@@ -5409,6 +6597,10 @@ components:
           type: string
           format: date-time
           readOnly: true
+        offers_in_person:
+          type: boolean
+          readOnly: true
+          description: Has a service offered in person.
         bio:
           type: string
           readOnly: true
@@ -5424,6 +6616,17 @@ components:
           items:
             $ref: '#/components/schemas/Service'
           readOnly: true
+        packages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Package'
+          readOnly: true
+        seminars:
+          type: array
+          items:
+            $ref: '#/components/schemas/Seminar'
+          readOnly: true
+          description: Upcoming group seminars with seats left.
       required:
       - avatar_url
       - bio
@@ -5439,15 +6642,107 @@ components:
       - is_verified
       - languages
       - next_available_at
+      - offers_in_person
+      - packages
       - profession
       - rating_avg
       - rating_count
+      - seminars
       - services
       - skills
       - slug
       - starting_price
       - timezone
       - years_experience
+    MentorSeminar:
+      type: object
+      description: The mentor's own view, with private details and who's coming.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          readOnly: true
+        description:
+          type: string
+          readOnly: true
+        service:
+          allOf:
+          - $ref: '#/components/schemas/SeminarService'
+          readOnly: true
+        start_at:
+          type: string
+          format: date-time
+          readOnly: true
+        end_at:
+          type: string
+          format: date-time
+          readOnly: true
+        duration_minutes:
+          type: integer
+          readOnly: true
+        capacity:
+          type: integer
+          readOnly: true
+        seats_left:
+          type: integer
+          readOnly: true
+        price:
+          allOf:
+          - $ref: '#/components/schemas/Money'
+          readOnly: true
+          description: Per seat.
+        format:
+          allOf:
+          - $ref: '#/components/schemas/SessionFormatEnum'
+          readOnly: true
+        in_person_area:
+          type: string
+          readOnly: true
+        seats_taken:
+          type: integer
+          readOnly: true
+        meeting_place:
+          type: string
+          readOnly: true
+        meeting_url:
+          type: string
+          format: uri
+          readOnly: true
+          description: Defaults to the mentor's link.
+        status:
+          allOf:
+          - $ref: '#/components/schemas/SeminarStatusEnum'
+          readOnly: true
+        cancellation_reason:
+          type: string
+          readOnly: true
+        attendees:
+          type: array
+          items:
+            $ref: '#/components/schemas/SeminarAttendee'
+          readOnly: true
+      required:
+      - attendees
+      - cancellation_reason
+      - capacity
+      - description
+      - duration_minutes
+      - end_at
+      - format
+      - id
+      - in_person_area
+      - meeting_place
+      - meeting_url
+      - price
+      - seats_left
+      - seats_taken
+      - service
+      - start_at
+      - status
+      - title
     MentorStatusCounts:
       type: object
       properties:
@@ -5547,6 +6842,10 @@ components:
           type: string
           format: date-time
           readOnly: true
+        offers_in_person:
+          type: boolean
+          readOnly: true
+          description: Has a service offered in person.
       required:
       - avatar_url
       - city
@@ -5560,6 +6859,7 @@ components:
       - is_verified
       - languages
       - next_available_at
+      - offers_in_person
       - profession
       - rating_avg
       - rating_count
@@ -5578,6 +6878,187 @@ components:
       required:
       - amount_cents
       - currency
+    Package:
+      type: object
+      description: A multi-session option of a service, priced for each format the
+        service is offered in.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          readOnly: true
+        session_count:
+          type: integer
+          readOnly: true
+        discount_percent:
+          type: integer
+          readOnly: true
+        validity_days:
+          type: integer
+          readOnly: true
+        prices:
+          allOf:
+          - $ref: '#/components/schemas/FormatPrices'
+          readOnly: true
+        regular_prices:
+          allOf:
+          - $ref: '#/components/schemas/FormatPrices'
+          readOnly: true
+          description: The same sessions booked one by one.
+        service:
+          allOf:
+          - $ref: '#/components/schemas/PackageService'
+          readOnly: true
+        is_active:
+          type: boolean
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - discount_percent
+      - id
+      - is_active
+      - prices
+      - regular_prices
+      - service
+      - session_count
+      - title
+      - updated_at
+      - validity_days
+    PackagePurchase:
+      type: object
+      description: A student's package with its remaining sessions. Expects `with_usage()`
+        annotations.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          readOnly: true
+        format:
+          allOf:
+          - $ref: '#/components/schemas/SessionFormatEnum'
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/PackagePurchaseStatusEnum'
+          readOnly: true
+        session_count:
+          type: integer
+          readOnly: true
+        sessions_used:
+          type: integer
+          readOnly: true
+        sessions_remaining:
+          type: integer
+          readOnly: true
+        duration_minutes:
+          type: integer
+          readOnly: true
+        price:
+          allOf:
+          - $ref: '#/components/schemas/Money'
+          readOnly: true
+        expires_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          description: Set when the bundle becomes active.
+        is_expired:
+          type: boolean
+          readOnly: true
+        mentor:
+          allOf:
+          - $ref: '#/components/schemas/BookingMentor'
+          readOnly: true
+        service_id:
+          type: string
+          format: uuid
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - duration_minutes
+      - expires_at
+      - format
+      - id
+      - is_expired
+      - mentor
+      - price
+      - service_id
+      - session_count
+      - sessions_remaining
+      - sessions_used
+      - status
+      - title
+    PackagePurchaseStatusEnum:
+      enum:
+      - pending_payment
+      - active
+      - cancelled
+      - refunded
+      type: string
+      description: |-
+        * `pending_payment` - Awaiting payment
+        * `active` - Active
+        * `cancelled` - Cancelled
+        * `refunded` - Refunded
+    PackageService:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        duration_minutes:
+          type: integer
+      required:
+      - duration_minutes
+      - id
+      - title
+    PackageWriteRequest:
+      type: object
+      properties:
+        service_id:
+          type: string
+          format: uuid
+        session_count:
+          type: integer
+          maximum: 24
+          minimum: 2
+        discount_percent:
+          type: integer
+          maximum: 50
+          minimum: 0
+        validity_days:
+          type: integer
+          maximum: 365
+          minimum: 7
+        is_active:
+          type: boolean
+          default: true
+      required:
+      - discount_percent
+      - service_id
+      - session_count
+      - validity_days
     PaginatedAdminNotificationList:
       type: object
       required:
@@ -6090,6 +7571,71 @@ components:
           type: integer
           maximum: 120
           minimum: 0
+    PatchedPackageWriteRequest:
+      type: object
+      properties:
+        service_id:
+          type: string
+          format: uuid
+        session_count:
+          type: integer
+          maximum: 24
+          minimum: 2
+        discount_percent:
+          type: integer
+          maximum: 50
+          minimum: 0
+        validity_days:
+          type: integer
+          maximum: 365
+          minimum: 7
+        is_active:
+          type: boolean
+          default: true
+    PatchedSeminarWriteRequest:
+      type: object
+      properties:
+        service_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 1000
+        start_at:
+          type: string
+          format: date-time
+        duration_minutes:
+          $ref: '#/components/schemas/DurationMinutesEnum'
+        capacity:
+          type: integer
+          maximum: 100
+          minimum: 2
+        price_cents:
+          type: integer
+          maximum: 1000000
+          minimum: 0
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+        format:
+          $ref: '#/components/schemas/SessionFormatEnum'
+        in_person_area:
+          type: string
+          maxLength: 120
+        meeting_place:
+          type: string
+          maxLength: 300
+        meeting_url:
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 300
+          - type: string
+            maxLength: 0
     PatchedServiceWriteRequest:
       type: object
       properties:
@@ -6114,6 +7660,17 @@ components:
         is_active:
           type: boolean
           default: true
+        online:
+          type: boolean
+        in_person:
+          type: boolean
+        in_person_extra_cents:
+          type: integer
+          maximum: 1000000
+          minimum: 0
+        in_person_area:
+          type: string
+          maxLength: 120
     PatchedStudentProfileRequest:
       type: object
       properties:
@@ -6288,6 +7845,10 @@ components:
             can't be booked.
         currency:
           type: string
+        min_session_price:
+          allOf:
+          - $ref: '#/components/schemas/Money'
+          description: Lowest price a mentor can set.
         booking_hold_minutes:
           type: integer
         mentor_response_hours:
@@ -6301,9 +7862,34 @@ components:
       - currency
       - free_cancellation_hours
       - mentor_response_hours
+      - min_session_price
       - payments_enabled
       - payments_livemode
       - require_verified_email
+    PurchaseRequestRequest:
+      type: object
+      properties:
+        format:
+          allOf:
+          - $ref: '#/components/schemas/SessionFormatEnum'
+          description: |-
+            Defaults to online when offered.
+
+            * `online` - Online
+            * `in_person` - In person
+    PurchaseResponse:
+      type: object
+      properties:
+        purchase:
+          $ref: '#/components/schemas/PackagePurchase'
+        checkout_url:
+          type: string
+          format: uri
+          nullable: true
+          description: Pay here; the bundle becomes usable once payment is confirmed.
+      required:
+      - checkout_url
+      - purchase
     ReasonRequest:
       type: object
       properties:
@@ -6325,6 +7911,7 @@ components:
           type: string
           format: uuid
           readOnly: true
+          nullable: true
         amount:
           allOf:
           - $ref: '#/components/schemas/Money'
@@ -6654,6 +8241,152 @@ components:
         * `student` - Student
         * `mentor` - Mentor
         * `admin` - Admin
+    Seminar:
+      type: object
+      description: 'Public view of a seminar: no attendee details, no exact meeting
+        place. Expects `with_seats()`.'
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          readOnly: true
+        description:
+          type: string
+          readOnly: true
+        service:
+          allOf:
+          - $ref: '#/components/schemas/SeminarService'
+          readOnly: true
+        start_at:
+          type: string
+          format: date-time
+          readOnly: true
+        end_at:
+          type: string
+          format: date-time
+          readOnly: true
+        duration_minutes:
+          type: integer
+          readOnly: true
+        capacity:
+          type: integer
+          readOnly: true
+        seats_left:
+          type: integer
+          readOnly: true
+        price:
+          allOf:
+          - $ref: '#/components/schemas/Money'
+          readOnly: true
+          description: Per seat.
+        format:
+          allOf:
+          - $ref: '#/components/schemas/SessionFormatEnum'
+          readOnly: true
+        in_person_area:
+          type: string
+          readOnly: true
+      required:
+      - capacity
+      - description
+      - duration_minutes
+      - end_at
+      - format
+      - id
+      - in_person_area
+      - price
+      - seats_left
+      - service
+      - start_at
+      - title
+    SeminarAttendee:
+      type: object
+      properties:
+        booking_id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        status:
+          $ref: '#/components/schemas/BookingStatusEnum'
+      required:
+      - booking_id
+      - display_name
+      - status
+    SeminarService:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+      required:
+      - id
+      - title
+    SeminarStatusEnum:
+      enum:
+      - scheduled
+      - completed
+      - cancelled
+      type: string
+      description: |-
+        * `scheduled` - Scheduled
+        * `completed` - Completed
+        * `cancelled` - Cancelled
+    SeminarWriteRequest:
+      type: object
+      properties:
+        service_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 1000
+        start_at:
+          type: string
+          format: date-time
+        duration_minutes:
+          $ref: '#/components/schemas/DurationMinutesEnum'
+        capacity:
+          type: integer
+          maximum: 100
+          minimum: 2
+        price_cents:
+          type: integer
+          maximum: 1000000
+          minimum: 0
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+        format:
+          $ref: '#/components/schemas/SessionFormatEnum'
+        in_person_area:
+          type: string
+          maxLength: 120
+        meeting_place:
+          type: string
+          maxLength: 300
+        meeting_url:
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 300
+          - type: string
+            maxLength: 0
+      required:
+      - capacity
+      - duration_minutes
+      - price_cents
+      - service_id
+      - start_at
     Service:
       type: object
       properties:
@@ -6674,6 +8407,21 @@ components:
           allOf:
           - $ref: '#/components/schemas/Money'
           readOnly: true
+          description: Price of an online session.
+        online:
+          type: boolean
+          readOnly: true
+        in_person:
+          type: boolean
+          readOnly: true
+        in_person_extra:
+          allOf:
+          - $ref: '#/components/schemas/Money'
+          readOnly: true
+          description: Added to `price` for an in-person session.
+        in_person_area:
+          type: string
+          readOnly: true
         is_active:
           type: boolean
           readOnly: true
@@ -6690,7 +8438,11 @@ components:
       - description
       - duration_minutes
       - id
+      - in_person
+      - in_person_area
+      - in_person_extra
       - is_active
+      - online
       - price
       - title
       - updated_at
@@ -6718,11 +8470,30 @@ components:
         is_active:
           type: boolean
           default: true
+        online:
+          type: boolean
+        in_person:
+          type: boolean
+        in_person_extra_cents:
+          type: integer
+          maximum: 1000000
+          minimum: 0
+        in_person_area:
+          type: string
+          maxLength: 120
       required:
       - description
       - duration_minutes
       - price_cents
       - title
+    SessionFormatEnum:
+      enum:
+      - online
+      - in_person
+      type: string
+      description: |-
+        * `online` - Online
+        * `in_person` - In person
     Skill:
       type: object
       properties:

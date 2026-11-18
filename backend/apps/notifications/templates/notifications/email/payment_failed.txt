@@ -1,7 +1,12 @@
 Hi {{ first_name }},
+{% if package %}
+We couldn't take payment for {{ service_title }} with {{ mentor_name }}.
 
+You can try again with another card from your packages: {{ site_url }}/dashboard/student/packages
+{% else %}
 We couldn't take payment for {{ service_title }} with {{ mentor_name }} on {{ when }}.
 
 You can try again with another card until {{ hold_until }}; after that the time is released.
 
 Your bookings: {{ site_url }}/dashboard/student/bookings
+{% endif %}

@@ -4,9 +4,9 @@ import type {
   AdminReview,
   AdminStats,
   AdminStatsParams,
-  AuditLogEntry,
   AdminUser,
   AdminUserParams,
+  AuditLogEntry,
   AvailabilityResponse,
   AvailabilityRule,
   Booking,
@@ -24,28 +24,36 @@ import type {
   IndustryWithCount,
   LedgerEntry,
   LoginInput,
+  MeetingPlaceReveal,
   MentorExperience,
   MentorOwnProfile,
+  MentorPackage,
   MentorProfile,
   MentorProfileInput,
   MentorSearchParams,
+  MentorSeminar,
   MentorService,
   MentorSummary,
+  PackageInput,
+  PackagePurchase,
   Paginated,
   PasswordResetConfirmInput,
   PaymentRecord,
   PaymentStatus,
   Payout,
   PublicConfig,
+  PurchaseResult,
   RefundInput,
   RefundRecord,
   RegisterInput,
   ReportStatus,
   ResolveReportInput,
   Review,
-  ReviewStatus,
   ReviewInput,
+  ReviewStatus,
+  SeminarInput,
   ServiceInput,
+  SessionFormat,
   Taxonomy,
   UpdateAccountInput,
   VerificationRequest,
@@ -93,7 +101,10 @@ export interface DataApi {
     get(id: string): Promise<Booking>;
     create(input: CreateBookingInput): Promise<Booking>;
     cancel(id: string, reason: string): Promise<Booking>;
-    accept(id: string): Promise<Booking>;
+    /** In person: `meetingPlace` (where to meet). Online: `meetingUrl` (defaults to the mentor's link). */
+    accept(id: string, details?: { meetingPlace?: string; meetingUrl?: string }): Promise<Booking>;
+    setMeetingLink(id: string, meetingUrl: string): Promise<Booking>;
+    setMeetingPlace(id: string, meetingPlace: string): Promise<Booking>;
     decline(id: string, reason: string): Promise<Booking>;
     complete(id: string): Promise<Booking>;
     review(id: string, input: ReviewInput): Promise<Review>;
@@ -110,6 +121,12 @@ export interface DataApi {
     createGoal(input: GoalInput): Promise<CareerGoal>;
     updateGoal(id: string, input: Partial<GoalInput>): Promise<CareerGoal>;
     deleteGoal(id: string): Promise<void>;
+    packages(mentorId?: string): Promise<PackagePurchase[]>;
+    package(purchaseId: string): Promise<PackagePurchase>;
+    /** Start (or resume) checkout for a multi-session option; usable once payment is confirmed. */
+    buyPackage(packageId: string, format?: SessionFormat): Promise<PurchaseResult>;
+    /** Take a seat in a group seminar. Paid seats come back `pending_payment` (then checkout). */
+    registerSeminar(seminarId: string): Promise<Booking>;
   };
   mentor: {
     profile(): Promise<MentorOwnProfile>;
@@ -120,6 +137,15 @@ export interface DataApi {
     services(): Promise<MentorService[]>;
     createService(input: ServiceInput): Promise<MentorService>;
     updateService(id: string, input: Partial<ServiceInput>): Promise<MentorService>;
+    packages(): Promise<MentorPackage[]>;
+    createPackage(input: PackageInput): Promise<MentorPackage>;
+    updatePackage(id: string, input: Partial<PackageInput>): Promise<MentorPackage>;
+    deletePackage(id: string): Promise<void>;
+    seminars(): Promise<MentorSeminar[]>;
+    createSeminar(input: SeminarInput): Promise<MentorSeminar>;
+    updateSeminar(id: string, input: Partial<SeminarInput>): Promise<MentorSeminar>;
+    cancelSeminar(id: string, reason: string): Promise<MentorSeminar>;
+    completeSeminar(id: string): Promise<MentorSeminar>;
     availabilityRules(): Promise<AvailabilityRule[]>;
     replaceAvailabilityRules(rules: AvailabilityRule[]): Promise<AvailabilityRule[]>;
     submitVerification(evidenceNote: string): Promise<MentorOwnProfile>;
@@ -128,6 +154,8 @@ export interface DataApi {
     payouts(page?: number): Promise<Paginated<Payout>>;
   };
   admin: {
+    /** Audited break-glass access to an in-person session's exact place; a reason is required. */
+    revealMeetingPlace(bookingId: string, reason: string): Promise<MeetingPlaceReveal>;
     stats(params?: AdminStatsParams): Promise<AdminStats>;
     users(params?: AdminUserParams): Promise<Paginated<AdminUser>>;
     suspendUser(id: string, reason: string): Promise<AdminUser>;

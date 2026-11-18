@@ -1,0 +1,1 @@
+Seminar cancelled: {{ service_title }} on {{ when }}

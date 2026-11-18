@@ -140,6 +140,36 @@ Priority: **P0** = required for MVP launch, **P1** = MVP if time allows, **P2** 
 | Mentor | Any time | Full refund |
 | Admin | Any time | Full or partial refund at admin's discretion |
 
+### 6.4 Session formats (online and in person)
+- Each service is offered **online**, **in person**, or both. An in-person session costs the service price plus an optional **in-person extra** set by the mentor (e.g. for travel). A free service with an in-person extra is therefore a paid session in person.
+- An in-person service shows a public, general **area** (e.g. "Gulshan, Dhaka"), never an exact address.
+- The student picks the format when booking. The mentor shares the exact **meeting place** when accepting, or later from the booking. The student sees it only once the session is confirmed. The place is never included in emails or notification logs; emails carry the format and area only.
+- Students can filter search results to mentors who meet in person.
+- **Administrators** can see the exact place of any in-person booking or seminar, in any status (including after it has taken place), for safety and incident handling. It is never shown in admin lists: the admin asks for it per session, must give a reason, and each request is recorded in the audit log (who, when, why; not the place itself).
+
+### 6.5 One session or several (multi-session options)
+- **No free sessions:** every service and seminar seat has a price of at least `MIN_SESSION_PRICE_CENTS` (default $1). Existing free services keep working until edited; editing one requires a price.
+- Each service can offer **multi-session options** alongside the single session: N sessions (2–24) with a discount (0–50%), to be used within 7–365 days. There is at most one option per size for a service.
+- The price follows the session price in the format the student chooses: N × (price, plus the in-person extra if in person), minus the discount. The student chooses **1 session** or **N sessions** in the booking panel.
+- Buying an option goes through checkout. The purchase is usable only once the payment provider confirms payment; the charge is taken immediately (there is no mentor answer to wait for).
+- A purchase records its terms (sessions, length, format, price) at purchase time; later edits by the mentor only affect new purchases. Sessions must take place before it expires.
+- Each session is booked from the purchase like any booking, at no extra charge. Credits follow §6.3: declined, expired and early-cancelled sessions go back to the purchase; a student cancelling a confirmed session less than 24 hours before it starts uses it up; mentor cancellations always return it.
+- A student holds at most one unfinished copy of the same option at a time. A fully refunded purchase can't be used for new bookings.
+
+### Online sessions
+- Sessions run on whatever video tool the mentor and student prefer. The mentor's default meeting link (profile) is used unless the mentor sets a link for that session when accepting, or changes it later. The link is shown to the student only once the session is confirmed. MentorBridge does not host video calls.
+
+### 6.6 Group seminars
+- A mentor can schedule a **group seminar**: one of their services at a fixed date and time for up to N students (2–100), at a price per seat, online or in person.
+- When booking a service that has upcoming seminars, the student chooses **One-to-one** (any open time, mentor accepts) or **Group seminar** (pick a date, take a seat). The choice only appears when such seminars exist.
+- Registering takes a seat straight away: free seats are confirmed at once; paid seats are held while the student pays and confirmed when the provider confirms payment (no mentor answer needed). Seats can't be double-taken, and a student can hold only one seat per seminar.
+- The seminar blocks the mentor's calendar (plus their buffer), so no one-to-one session can be booked over it, and it can't be scheduled over an existing booking. A student can't hold a seminar seat and another session at the same time.
+- Students see seats left, never who else is coming. The mentor sees the attendee list. An in-person seminar shows its area publicly; the exact place is shown only to students with a confirmed seat and is never emailed.
+- A student cancelling a seat follows §6.3. A mentor or admin cancelling the seminar cancels every seat with a full refund, and each student gets one email. Mentors can't cancel individual seats.
+- Once anyone has registered, the time, length, price, session and format are fixed; the mentor cancels and reschedules instead. Title, description, place, link and seats (not below the number taken) can still change.
+- After it starts, the mentor marks the seminar completed; confirmed seats become completed and students can review it.
+- Packages (§6.5) apply to one-to-one sessions only.
+
 ## 7. Trust and integrity requirements
 - Only `approved` mentors appear in search or can be booked.
 - The "Verified" badge is shown **only** for mentors approved through the admin verification workflow.

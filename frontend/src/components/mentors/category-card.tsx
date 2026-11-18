@@ -39,9 +39,9 @@ export function CategoryCard({ industry }: { industry: IndustryWithCount }) {
       </span>
       <span className="min-w-0">
         <span className="block font-medium">{industry.name}</span>
-        <span className="block text-sm text-muted-foreground">
-          {industry.mentor_count > 0 ? pluralize(industry.mentor_count, "mentor") : "Be the first mentor"}
-        </span>
+        {industry.mentor_count > 0 ? (
+          <span className="block text-sm text-muted-foreground">{pluralize(industry.mentor_count, "mentor")}</span>
+        ) : null}
       </span>
     </Link>
   );

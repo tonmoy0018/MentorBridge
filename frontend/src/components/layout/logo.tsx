@@ -21,7 +21,9 @@ export function Logo({ className }: { className?: string }) {
   return (
     <Link href="/" className={cn("flex items-center gap-2 rounded-md font-semibold tracking-tight", className)}>
       <LogoMark />
-      <span className="text-lg">MentorBridge</span>
+      <span className="text-lg">
+        Mentor<span className="text-primary">Bridge</span>
+      </span>
     </Link>
   );
 }

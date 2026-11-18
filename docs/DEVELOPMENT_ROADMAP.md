@@ -224,6 +224,45 @@ Independent backend and frontend reviews plus a local rehearsal of the productio
 - [ ] Development-only: IP rate limits can be spoofed through the dev proxy. Production overwrites the header at Caddy.
 - [ ] Media on a local volume: single host only. Use object storage before scaling out.
 
+## PKG — Session packages and in-person sessions (2026-11-08)
+
+### Done
+- Services can be online, in person, or both, with an in-person extra and a public area. The format is chosen at booking; the mentor shares the exact meeting place, visible to the student once confirmed and never sent in emails. There is an "in person" search filter.
+- Mentors create packages (N sessions of a service, format, price, validity). Students get free packages and book sessions from them. Credits are derived from bookings and follow the cancellation policy. Mentors can't delete a service a package uses, change its length, or drop a format a package uses.
+- Tests: `tests/test_packages.py` (31 backend tests), `tests/lib/sessions.test.ts`, E2E journey step M (mentor creates an in-person service and a package; a student gets the package, books from it, and books an in-person session that the mentor accepts with a meeting place).
+
+### Not done
+- ~~Paid package checkout~~: done in PRICE below.
+- No admin screen for package purchases yet (read-only Django admin only). No email when a student gets a package.
+- In-person safety: guidance text only (meet in public). No identity checks or in-app reporting tied to a meeting.
+
+## PRICE — Paid sessions, multi-session options, meeting links (2026-11-19)
+
+### Done
+- No free sessions: `MIN_SESSION_PRICE_CENTS` (default 100) enforced when services and seminars are created or edited; exposed as `min_session_price` in `GET /config/`. Test and E2E settings use 0 so those suites can run without payments.
+- Packages became multi-session options of a service (`session_count`, `discount_percent`, `validity_days`); prices are derived per format. The data migration turned existing fixed prices into the equivalent discount.
+- Paid options are bought through the provider: `Payment` now belongs to a booking **or** a package purchase; purchases are `pending_payment` → `active` (captured at once on authorisation) / `cancelled` / `refunded`. Earnings and admin payments include them.
+- Mentors can set a meeting link per online session (on accept or later).
+- Tests: `tests/test_packages.py` (bundle payments with signed webhooks, minimum price, meeting links); E2E step M rewritten for the booking-panel flow.
+
+### Not done
+- No automatic refund of unused sessions when a student asks to cancel a bundle; an admin refunds from the payments page.
+- No in-browser test of a real card payment: the E2E suite runs with payments off. Verify with Stripe test mode (PAYMENTS.md §5).
+
+## SEM — Group seminars (2026-11-18)
+
+### Done
+- `Seminar` model; each seat is a `Booking` with `seminar` set, so payments, refunds, cancellations, reminders, reviews and the student's bookings list are shared with one-to-one sessions. The mentor overlap constraint skips seats; scheduled seminars count as busy time in slot generation; the student overlap constraint still applies.
+- Mentor: schedule, edit (terms locked once anyone registers), cancel (all seats cancelled and refunded, one email each) and complete seminars from Services, with the attendee list. Public: "Group seminars" on the profile and a One-to-one / Group seminar choice in the booking panel. Admin: `GET /admin/seminars/` and cancel (API only; read-only Django admin).
+- Tests: `tests/test_seminars.py` (20 backend tests), E2E journey step N (schedule, choose in the panel, fill the last seat, cancel).
+
+- Admin access to exact locations (2026-11-18): `POST /admin/bookings/{id}/meeting-place/` and `/admin/seminars/{id}/meeting-place/` reveal the place in any status, require a reason and write an audit entry (`*.meeting_place_viewed`, reason only). Admin lists and booking detail never include the place. "Show exact location" on the admin Bookings page. Tests: `tests/test_meeting_place_access.py`, E2E step M.
+
+### Not done
+- Waiting list for full seminars; automatic cancellation below a minimum number of attendees; recurring series ("6 weekly classes").
+- A public `/seminars` listing across mentors, and an admin dashboard page (the API exists).
+- Paid seats depend on payments going live, like everything paid.
+
 ## M7 — Hardening & launch readiness
 - [ ] GitHub Actions CI: lint, typecheck, backend tests (Postgres service), frontend tests, Playwright, `pip-audit`, `pnpm audit`, OpenAPI type drift check
 - [ ] Security review (OWASP ASVS L1 checklist), CSP, HSTS, cookie flags verified in prod config

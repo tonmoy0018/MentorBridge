@@ -4,11 +4,12 @@ import { CalendarX2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useId, useMemo, useState } from "react";
 import { toast } from "sonner";
-import type { MentorService } from "@/lib/api/types";
+import type { MentorPackage, MentorService, Seminar, SessionFormat } from "@/lib/api/types";
 import { getErrorMessage, isApiError } from "@/lib/api/errors";
 import { goToCheckout } from "@/lib/checkout";
 import { api } from "@/lib/data/client";
-import { formatDate, formatDuration, formatMoney, formatTime, timeZoneLabel } from "@/lib/format";
+import { formatDate, formatDuration, formatMoney, formatTime, pluralize, timeZoneLabel } from "@/lib/format";
+import { FORMAT_LABEL, serviceFormats, sessionPrice } from "@/lib/sessions";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,6 +20,8 @@ import { NativeSelect } from "@/components/forms/native-select";
 import { loginRedirectPath } from "@/hooks/use-api-error-handler";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { useReloadOnBack } from "@/hooks/use-reload-on-back";
+import { BundleCheckout } from "./bundle-checkout";
+import { SeminarPicker } from "./seminar-picker";
 
 const LOOKAHEAD_DAYS = 21;
 
@@ -36,17 +39,31 @@ function utcDate(offsetDays: number) {
  */
 export function BookingWidget({
   mentorId,
+  mentorUuid,
   mentorFirstName,
   services,
   initialServiceId,
+  initialPackageId,
+  seminars = [],
+  initialSeminarId,
+  packages = [],
   paymentsEnabled,
   paymentsLivemode,
   freeCancellationHours,
 }: {
   mentorId: string;
+  /** The mentor's UUID, to find the student's packages with them. */
+  mentorUuid: string;
   mentorFirstName: string;
   services: MentorService[];
   initialServiceId?: string;
+  /** Preselect one of the student's packages (e.g. right after getting it). */
+  initialPackageId?: string;
+  /** The mentor's upcoming group seminars; a service with any offers "Group seminar". */
+  seminars?: Seminar[];
+  initialSeminarId?: string;
+  /** Multi-session options; a service with any offers "1 session" or "N sessions". */
+  packages?: MentorPackage[];
   /** From GET /config/. While false, the API refuses paid bookings, so the UI does too. */
   paymentsEnabled: boolean;
   /** False while the provider runs in sandbox mode (no real money moves). */
@@ -57,23 +74,64 @@ export function BookingWidget({
   const pathname = usePathname();
   const selectId = useId();
   useReloadOnBack();
-  const isBookable = (s: MentorService) => paymentsEnabled || s.price.amount_cents === 0;
+  const isBookable = (s: MentorService) =>
+    paymentsEnabled || serviceFormats(s).some((f) => sessionPrice(s, f).amount_cents === 0);
+  const initialSeminar = seminars.find((s) => s.id === initialSeminarId);
   const [serviceId, setServiceId] = useState(
-    services.some((s) => s.id === initialServiceId)
-      ? initialServiceId!
-      : (services.find(isBookable)?.id ?? services[0]?.id ?? ""),
+    initialSeminar && services.some((s) => s.id === initialSeminar.service.id)
+      ? initialSeminar.service.id
+      : services.some((s) => s.id === initialServiceId)
+        ? initialServiceId!
+        : (services.find(isBookable)?.id ?? services[0]?.id ?? ""),
   );
+  const [mode, setMode] = useState<"one" | "group">(initialSeminar ? "group" : "one");
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   // Set when the chosen time was taken by someone else; cleared when the dialog closes.
   const [slotTaken, setSlotTaken] = useState(false);
 
-  const service = services.find((s) => s.id === serviceId);
-  const paymentBlocked = Boolean(service && !isBookable(service));
+  const [formatChoice, setFormatChoice] = useState<SessionFormat>("online");
+  const [packageId, setPackageId] = useState(initialPackageId ?? "");
 
-  const availability = useApiQuery(`availability:${mentorId}:${serviceId}`, () =>
-    api.mentors.availability(mentorId, { service: serviceId, from: utcDate(0), to: utcDate(LOOKAHEAD_DAYS) }),
+  // The student's packages with this mentor that still have sessions. Signed-out visitors and
+  // non-students simply have none.
+  const purchases = useApiQuery(`packages:${mentorUuid}`, () => api.student.packages(mentorUuid).catch(() => []));
+  const usablePackages = (purchases.data ?? []).filter(
+    (p) => p.status === "active" && !p.is_expired && p.sessions_remaining > 0,
+  );
+  const [bundleId, setBundleId] = useState("");
+  const purchase = usablePackages.find((p) => p.id === packageId);
+
+  const serviceSeminars = seminars.filter((s) => s.service.id === serviceId);
+  // Group seminars don't use packages; a chosen package always means one-to-one.
+  const groupMode = mode === "group" && !purchase && serviceSeminars.length > 0;
+
+  const effectiveServiceId = purchase ? purchase.service_id : serviceId;
+  const service = services.find((s) => s.id === effectiveServiceId);
+  const formats = service ? serviceFormats(service) : [];
+  const format: SessionFormat = purchase
+    ? purchase.format
+    : formats.includes(formatChoice)
+      ? formatChoice
+      : (formats[0] ?? "online");
+  // null = covered by the package.
+  const price = purchase || !service ? null : sessionPrice(service, format);
+  const isFree = !price || price.amount_cents === 0;
+  const serviceBundles = purchase || groupMode ? [] : packages.filter((p) => p.service.id === serviceId && p.prices[format]);
+  const bundle = serviceBundles.find((p) => p.id === bundleId);
+  const paymentBlocked = Boolean(price && price.amount_cents > 0 && !paymentsEnabled);
+  const cheapestSeat = serviceSeminars.reduce<Seminar | undefined>(
+    (low, s) => (!low || s.price.amount_cents < low.price.amount_cents ? s : low),
+    undefined,
+  );
+
+  const availability = useApiQuery(`availability:${mentorId}:${effectiveServiceId}`, () =>
+    api.mentors.availability(mentorId, {
+      service: effectiveServiceId,
+      from: utcDate(0),
+      to: utcDate(LOOKAHEAD_DAYS),
+    }),
   );
   // Note: slots for a paid service are still loaded so they appear as soon as payments launch;
   // the request button stays disabled while `paymentBlocked`.
@@ -103,7 +161,12 @@ export function BookingWidget({
     if (!service || !selectedSlot) return;
     let booking;
     try {
-      booking = await api.bookings.create({ service_id: service.id, start_at: selectedSlot, student_note: note });
+      booking = await api.bookings.create({
+        service_id: service.id,
+        start_at: selectedSlot,
+        student_note: note,
+        ...(purchase ? { package_purchase_id: purchase.id } : { format }),
+      });
     } catch (error) {
       if (isApiError(error) && error.kind === "unauthenticated") {
         router.push(loginRedirectPath(pathname));
@@ -144,28 +207,207 @@ export function BookingWidget({
 
   return (
     <div className="grid min-w-0 gap-5">
-      <div className="grid min-w-0 gap-2">
-        <label htmlFor={selectId} className="text-sm font-medium">
-          Service
-        </label>
-        <NativeSelect
-          id={selectId}
-          value={serviceId}
-          onChange={(e) => {
-            setServiceId(e.target.value);
-            setSelectedDay(null);
-            setSelectedSlot(null);
-          }}
-        >
-          {services.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.title} · {formatDuration(s.duration_minutes)} · {formatMoney(s.price)}
-              {isBookable(s) ? "" : " (online payment coming soon)"}
-            </option>
-          ))}
-        </NativeSelect>
-      </div>
+      {usablePackages.length > 0 && !groupMode ? (
+        <div className="grid min-w-0 gap-2">
+          <label htmlFor={`${selectId}-pay`} className="text-sm font-medium">
+            Pay with
+          </label>
+          <NativeSelect
+            id={`${selectId}-pay`}
+            value={purchase?.id ?? ""}
+            onChange={(e) => {
+              setPackageId(e.target.value);
+              setSelectedDay(null);
+              setSelectedSlot(null);
+            }}
+          >
+            <option value="">Pay per session</option>
+            {usablePackages.map((p) => (
+              <option key={p.id} value={p.id}>
+                Package: {p.title} ({pluralize(p.sessions_remaining, "session")} left)
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
+      ) : null}
 
+      {purchase ? (
+        service ? (
+          <p className="rounded-lg bg-muted/60 p-3 text-sm">
+            {service.title} · {formatDuration(purchase.duration_minutes)} · {FORMAT_LABEL[purchase.format]}
+            {purchase.format === "in_person" && service.in_person_area ? ` in ${service.in_person_area}` : ""}. Book
+            before {purchase.expires_at ? formatDate(purchase.expires_at) : "it expires"}.
+          </p>
+        ) : (
+          <p role="note" className="rounded-lg bg-warning-soft p-3 text-sm text-warning">
+            {mentorFirstName} isn&apos;t offering this package&apos;s session right now. Contact support if you need
+            help using your package.
+          </p>
+        )
+      ) : (
+        <div className="grid min-w-0 gap-2">
+          <label htmlFor={selectId} className="text-sm font-medium">
+            Service
+          </label>
+          <NativeSelect
+            id={selectId}
+            value={serviceId}
+            onChange={(e) => {
+              setServiceId(e.target.value);
+              setSelectedDay(null);
+              setSelectedSlot(null);
+            }}
+          >
+            {services.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.title} · {formatDuration(s.duration_minutes)} · {formatMoney(sessionPrice(s, serviceFormats(s)[0] ?? "online"))}
+                {isBookable(s) ? "" : " (online payment coming soon)"}
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
+      )}
+
+      {!purchase && cheapestSeat ? (
+        <fieldset className="grid min-w-0 gap-2">
+          <legend className="mb-2 text-sm font-medium">Session type</legend>
+          {(
+            [
+              ["one", "One-to-one", "Any open time · just you", price ? formatMoney(price) : ""],
+              [
+                "group",
+                "Group seminar",
+                `Fixed dates · up to ${Math.max(...serviceSeminars.map((s) => s.capacity))} people`,
+                `${formatMoney(cheapestSeat.price)}${cheapestSeat.price.amount_cents > 0 ? " per seat" : ""}`,
+              ],
+            ] as const
+          ).map(([value, label, hint, cost]) => (
+            <label
+              key={value}
+              className={cn(
+                "flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-sm",
+                (value === "group") === groupMode ? "border-primary bg-primary/5" : "bg-card hover:border-primary/50",
+              )}
+            >
+              <input
+                type="radio"
+                name={`${selectId}-mode`}
+                value={value}
+                checked={(value === "group") === groupMode}
+                onChange={() => setMode(value)}
+                className="size-4 accent-primary"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="font-medium">{label}</span>
+                <span className="block text-muted-foreground">{hint}</span>
+              </span>
+              <span className="font-medium">{cost}</span>
+            </label>
+          ))}
+        </fieldset>
+      ) : null}
+
+      {groupMode ? (
+        <SeminarPicker
+          key={serviceId}
+          seminars={serviceSeminars}
+          mentorFirstName={mentorFirstName}
+          initialSeminarId={initialSeminarId}
+          paymentsEnabled={paymentsEnabled}
+          paymentsLivemode={paymentsLivemode}
+          freeCancellationHours={freeCancellationHours}
+        />
+      ) : (
+      <>
+      {!purchase && service && formats.length > 1 ? (
+        <fieldset className="grid min-w-0 gap-2">
+          <legend className="mb-2 text-sm font-medium">Format</legend>
+          {formats.map((f) => (
+            <label
+              key={f}
+              className={cn(
+                "flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-sm",
+                f === format ? "border-primary bg-primary/5" : "bg-card hover:border-primary/50",
+              )}
+            >
+              <input
+                type="radio"
+                name={`${selectId}-format`}
+                value={f}
+                checked={f === format}
+                onChange={() => setFormatChoice(f)}
+                className="size-4 accent-primary"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="font-medium">{FORMAT_LABEL[f]}</span>
+                {f === "in_person" ? (
+                  <span className="block text-muted-foreground">Meet in {service.in_person_area}</span>
+                ) : (
+                  <span className="block text-muted-foreground">Video call</span>
+                )}
+              </span>
+              <span className="font-medium">{formatMoney(sessionPrice(service, f))}</span>
+            </label>
+          ))}
+        </fieldset>
+      ) : !purchase && service && format === "in_person" ? (
+        <p className="text-sm text-muted-foreground">In person only: meet in {service.in_person_area}.</p>
+      ) : null}
+
+      {serviceBundles.length > 0 && price ? (
+        <fieldset className="grid min-w-0 gap-2">
+          <legend className="mb-2 text-sm font-medium">How many sessions</legend>
+          {[undefined, ...serviceBundles].map((option) => {
+            const id = option?.id ?? "";
+            const cost = option ? option.prices[format]! : price;
+            return (
+              <label
+                key={id || "one"}
+                className={cn(
+                  "flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-sm",
+                  id === (bundle?.id ?? "") ? "border-primary bg-primary/5" : "bg-card hover:border-primary/50",
+                )}
+              >
+                <input
+                  type="radio"
+                  name={`${selectId}-count`}
+                  value={id}
+                  checked={id === (bundle?.id ?? "")}
+                  onChange={() => setBundleId(id)}
+                  className="size-4 accent-primary"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="font-medium">{option ? `${option.session_count} sessions` : "1 session"}</span>
+                  <span className="block text-muted-foreground">
+                    {option
+                      ? `Book each when it suits you · within ${option.validity_days} days`
+                      : "Pick a time now"}
+                  </span>
+                </span>
+                <span className="text-right font-medium">
+                  {formatMoney(cost)}
+                  {option && option.discount_percent > 0 ? (
+                    <span className="block text-xs font-normal text-muted-foreground">save {option.discount_percent}%</span>
+                  ) : null}
+                </span>
+              </label>
+            );
+          })}
+        </fieldset>
+      ) : null}
+
+      {bundle ? (
+        <BundleCheckout
+          key={`${bundle.id}:${format}`}
+          bundle={bundle}
+          format={format}
+          mentorSlug={mentorId}
+          mentorFirstName={mentorFirstName}
+          paymentsEnabled={paymentsEnabled}
+          paymentsLivemode={paymentsLivemode}
+        />
+      ) : (
+      <>
       {paymentBlocked ? (
         <p role="note" className="rounded-lg bg-warning-soft p-3 text-sm text-warning">
           Online payment isn&apos;t available yet, so paid sessions can&apos;t be booked.
@@ -255,7 +497,8 @@ export function BookingWidget({
         {service && selectedSlot ? (
           <p>
             <span className="font-medium">{service.title}</span> on {formatDate(selectedSlot)} at{" "}
-            {formatTime(selectedSlot)} {zone} · {formatMoney(service.price)}
+            {formatTime(selectedSlot)} {zone} · {FORMAT_LABEL[format]} ·{" "}
+            {price ? formatMoney(price) : "from your package"}
           </p>
         ) : (
           <p className="text-muted-foreground">Choose a date and time to continue.</p>
@@ -267,7 +510,7 @@ export function BookingWidget({
         disabled={!service || !selectedSlot || paymentBlocked}
         onClick={() => setConfirmOpen(true)}
       >
-        {service && service.price.amount_cents > 0 && !paymentBlocked ? "Book and pay" : "Request booking"}
+        {!isFree && !paymentBlocked ? "Book and pay" : "Request booking"}
       </Button>
 
       {service && selectedSlot ? (
@@ -280,13 +523,17 @@ export function BookingWidget({
               setSlotTaken(false);
             }
           }}
-          title={service.price.amount_cents === 0 ? "Request this session?" : "Continue to payment?"}
+          title={isFree ? "Request this session?" : "Continue to payment?"}
           description={
-            service.price.amount_cents === 0
-              ? `${mentorFirstName} will be asked to accept your request. You can cancel any time before the session starts.`
+            isFree
+              ? `${mentorFirstName} will be asked to accept your request. You can cancel any time before the session starts.${
+                  purchase
+                    ? ` The session comes from your package; cancelling at least ${freeCancellationHours} hours before it starts returns it to the package.`
+                    : ""
+                }`
               : `You'll pay on our payment provider's secure page. Your card is authorised now but only charged if ${mentorFirstName} accepts; if they decline or don't respond, the authorisation is released. After they accept, you can cancel for a full refund up to ${freeCancellationHours} hours before the session.`
           }
-          confirmLabel={service.price.amount_cents === 0 ? "Send request" : "Continue to payment"}
+          confirmLabel={isFree ? "Send request" : "Continue to payment"}
           reason={{
             label: `Note for ${mentorFirstName}`,
             placeholder: "What would you like help with? Share any context that will make the session useful.",
@@ -301,17 +548,32 @@ export function BookingWidget({
               {formatDate(selectedSlot)}, {formatTime(selectedSlot)} {zone}
             </dd>
             <dt className="text-muted-foreground">Length</dt>
-            <dd>{formatDuration(service.duration_minutes)}</dd>
+            <dd>{formatDuration(purchase?.duration_minutes ?? service.duration_minutes)}</dd>
+            <dt className="text-muted-foreground">Format</dt>
+            <dd>
+              {FORMAT_LABEL[format]}
+              {format === "in_person" && service.in_person_area ? ` · ${service.in_person_area}` : ""}
+            </dd>
             <dt className="text-muted-foreground">Price</dt>
-            <dd className="font-medium">{formatMoney(service.price)}</dd>
+            <dd className="font-medium">{price ? formatMoney(price) : `Included in ${purchase?.title}`}</dd>
           </dl>
-          {service.price.amount_cents > 0 && !paymentsLivemode ? (
+          {format === "in_person" ? (
+            <p className="text-sm text-muted-foreground">
+              {mentorFirstName} will share the exact meeting place once the session is confirmed. Meet somewhere
+              public.
+            </p>
+          ) : null}
+          {!isFree && !paymentsLivemode ? (
             <p role="note" className="rounded-lg bg-warning-soft p-3 text-sm text-warning">
               Test mode: payments run in the provider&apos;s sandbox. Use a test card; no real money is taken.
             </p>
           ) : null}
         </ConfirmationDialog>
       ) : null}
+      </>
+      )}
+      </>
+      )}
     </div>
   );
 }

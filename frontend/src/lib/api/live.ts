@@ -20,6 +20,7 @@ export function toMentorQuery(params: MentorSearchParams) {
     price_min: params.price_min !== undefined ? Math.round(params.price_min * 100) : undefined,
     price_max: params.price_max !== undefined ? Math.round(params.price_max * 100) : undefined,
     available_within_days: params.available_within,
+    in_person: params.in_person || undefined,
     ordering: params.sort ? ORDERING[params.sort] : undefined,
     page: params.page,
     page_size: params.page_size,
@@ -97,7 +98,14 @@ export function createLiveDataApi(request: Transport): DataApi {
       get: (bookingId) => request(`/bookings/${id(bookingId)}/`),
       create: (input) => request("/bookings/", { method: "POST", body: input }),
       cancel: (bookingId, reason) => action(bookingId, "cancel", { reason }),
-      accept: (bookingId) => action(bookingId, "accept"),
+      accept: (bookingId, details = {}) =>
+        action(bookingId, "accept", {
+          ...(details.meetingPlace ? { meeting_place: details.meetingPlace } : {}),
+          ...(details.meetingUrl ? { meeting_url: details.meetingUrl } : {}),
+        }),
+      setMeetingLink: (bookingId, meetingUrl) => action(bookingId, "meeting-link", { meeting_url: meetingUrl }),
+      setMeetingPlace: (bookingId, meetingPlace) =>
+        action(bookingId, "meeting-place", { meeting_place: meetingPlace }),
       decline: (bookingId, reason) => action(bookingId, "decline", { reason }),
       complete: (bookingId) => action(bookingId, "complete"),
       review: (bookingId, input) =>
@@ -127,6 +135,11 @@ export function createLiveDataApi(request: Transport): DataApi {
       updateGoal: (goalId, input) =>
         request(`/me/student/goals/${id(goalId)}/`, { method: "PATCH", body: input }),
       deleteGoal: (goalId) => request(`/me/student/goals/${id(goalId)}/`, { method: "DELETE" }),
+      packages: (mentorId) => request("/me/student/packages/", { query: { mentor: mentorId } }),
+      package: (purchaseId) => request(`/me/student/packages/${id(purchaseId)}/`),
+      buyPackage: (packageId, format) =>
+        request(`/packages/${id(packageId)}/purchase/`, { method: "POST", body: format ? { format } : {} }),
+      registerSeminar: (seminarId) => request(`/seminars/${id(seminarId)}/register/`, { method: "POST" }),
     },
     mentor: {
       profile: () => request("/me/mentor/profile/"),
@@ -143,6 +156,18 @@ export function createLiveDataApi(request: Transport): DataApi {
       createService: (input) => request("/me/mentor/services/", { method: "POST", body: input }),
       updateService: (serviceId, input) =>
         request(`/me/mentor/services/${id(serviceId)}/`, { method: "PATCH", body: input }),
+      packages: () => request("/me/mentor/packages/"),
+      createPackage: (input) => request("/me/mentor/packages/", { method: "POST", body: input }),
+      updatePackage: (packageId, input) =>
+        request(`/me/mentor/packages/${id(packageId)}/`, { method: "PATCH", body: input }),
+      deletePackage: (packageId) => request(`/me/mentor/packages/${id(packageId)}/`, { method: "DELETE" }),
+      seminars: () => request("/me/mentor/seminars/"),
+      createSeminar: (input) => request("/me/mentor/seminars/", { method: "POST", body: input }),
+      updateSeminar: (seminarId, input) =>
+        request(`/me/mentor/seminars/${id(seminarId)}/`, { method: "PATCH", body: input }),
+      cancelSeminar: (seminarId, reason) =>
+        request(`/me/mentor/seminars/${id(seminarId)}/cancel/`, { method: "POST", body: { reason } }),
+      completeSeminar: (seminarId) => request(`/me/mentor/seminars/${id(seminarId)}/complete/`, { method: "POST" }),
       availabilityRules: () => request("/me/mentor/availability/rules/"),
       replaceAvailabilityRules: (rules) =>
         request("/me/mentor/availability/rules/", { method: "PUT", body: rules }),
@@ -156,6 +181,8 @@ export function createLiveDataApi(request: Transport): DataApi {
       payouts: (page) => request("/me/mentor/payouts/", { query: { page } }),
     },
     admin: {
+      revealMeetingPlace: (bookingId, reason) =>
+        request(`/admin/bookings/${id(bookingId)}/meeting-place/`, { method: "POST", body: { reason } }),
       stats: (params = {}) => request("/admin/stats/", { query: { ...params } }),
       users: (params = {}) => request("/admin/users/", { query: { ...params } }),
       suspendUser: (userId, reason) =>

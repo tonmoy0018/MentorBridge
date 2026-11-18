@@ -17,3 +17,5 @@ CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 MEDIA_ROOT = BASE_DIR / ".test-media"
 FRONTEND_URL = "http://localhost:3000"
+# Most tests use free sessions to stay clear of payments; the minimum price has its own tests.
+MIN_SESSION_PRICE_CENTS = 0

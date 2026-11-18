@@ -5,6 +5,8 @@ from rest_framework import permissions, serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.common.serializers import MoneySerializer, money
+
 
 class HealthView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -51,6 +53,7 @@ class PublicConfigView(APIView):
                         "can't be booked."
                     ),
                     "currency": serializers.CharField(),
+                    "min_session_price": MoneySerializer(help_text="Lowest price a mentor can set."),
                     "booking_hold_minutes": serializers.IntegerField(),
                     "mentor_response_hours": serializers.IntegerField(),
                     "free_cancellation_hours": serializers.IntegerField(),
@@ -65,6 +68,7 @@ class PublicConfigView(APIView):
                 "payments_enabled": settings.PAYMENTS_ENABLED,
                 "payments_livemode": settings.PAYMENTS_LIVEMODE,
                 "currency": settings.PLATFORM_CURRENCY,
+                "min_session_price": money(settings.MIN_SESSION_PRICE_CENTS, settings.PLATFORM_CURRENCY),
                 "booking_hold_minutes": settings.BOOKING_HOLD_MINUTES,
                 "mentor_response_hours": settings.MENTOR_RESPONSE_HOURS,
                 "free_cancellation_hours": settings.FREE_CANCELLATION_HOURS,

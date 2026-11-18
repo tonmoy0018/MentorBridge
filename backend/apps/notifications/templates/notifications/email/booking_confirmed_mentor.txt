@@ -4,5 +4,9 @@ Your session with {{ student_name }} is confirmed.
 
 Service: {{ service_title }}
 When: {{ when }}
-
+Format: {{ format_label }}
+{% if package_title %}Paid with package: {{ package_title }}
+{% endif %}{% if in_person %}
+If you haven't yet, add the exact meeting place to the booking so the student knows where to go.
+{% endif %}
 See your upcoming sessions: {{ site_url }}/dashboard/mentor/bookings

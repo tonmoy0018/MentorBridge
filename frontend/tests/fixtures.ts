@@ -27,6 +27,7 @@ export function makeMentor(overrides: Partial<MentorSummary> = {}): MentorSummar
     rating_count: 0,
     starting_price: { amount_cents: 4000, currency: "USD" },
     next_available_at: null,
+    offers_in_person: false,
     ...overrides,
   };
 }

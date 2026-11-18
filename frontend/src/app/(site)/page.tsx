@@ -107,11 +107,16 @@ export default function HomePage() {
 
       <section aria-labelledby="featured-heading" className="border-y bg-muted/40">
         <div className="container-page py-16 sm:py-20">
-          <h2 id="featured-heading" className="text-2xl font-semibold sm:text-3xl">
-            Highly rated mentors
-          </h2>
-          <p className="mt-2 text-muted-foreground">Verified mentors with the best reviews from completed sessions.</p>
-          <Suspense fallback={<CardListSkeleton count={3} className="mt-8 md:grid-cols-3" label="Loading mentors…" />}>
+          <Suspense
+            fallback={
+              <>
+                <h2 id="featured-heading" className="text-2xl font-semibold sm:text-3xl">
+                  Meet our mentors
+                </h2>
+                <CardListSkeleton count={3} className="mt-8 md:grid-cols-3" label="Loading mentors…" />
+              </>
+            }
+          >
             <FeaturedMentors />
           </Suspense>
         </div>
@@ -230,15 +235,16 @@ function Hero() {
               </Link>
             ))}
           </div>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Button asChild size="lg">
-              <Link href="/mentors">
-                Find a Mentor <ArrowRight aria-hidden="true" />
+          <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
+            <Link href="/mentors" className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
+              Browse all mentors <ArrowRight className="size-4" aria-hidden="true" />
+            </Link>
+            <span className="text-muted-foreground">
+              Experienced professional?{" "}
+              <Link href="/signup/mentor" className="font-medium text-foreground underline-offset-4 hover:underline">
+                Become a mentor
               </Link>
-            </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link href="/signup/mentor">Become a Mentor</Link>
-            </Button>
+            </span>
           </div>
         </div>
 
@@ -246,9 +252,9 @@ function Hero() {
           <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
             What mentors can help with
           </h2>
-          <ul className="mt-5 grid gap-4">
+          <ul className="mt-5 grid gap-5">
             {HELP_TOPICS.map((topic) => (
-              <li key={topic.title} className="flex gap-4 rounded-xl bg-card p-4 ring-1 ring-border">
+              <li key={topic.title} className="flex gap-4">
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
                   <topic.icon className="size-5" aria-hidden="true" />
                 </span>
@@ -279,14 +285,25 @@ async function Categories() {
       </p>
     );
   }
+  const withMentors = industries.filter((i) => i.mentor_count > 0).sort((a, b) => b.mentor_count - a.mentor_count);
+  const empty = industries.filter((i) => i.mentor_count === 0);
+  // Before any mentor is live, show every area so the page still explains what's covered.
+  const cards = withMentors.length > 0 ? withMentors : industries;
   return (
-    <ul className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {industries.map((industry) => (
-        <li key={industry.id}>
-          <CategoryCard industry={industry} />
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {cards.map((industry) => (
+          <li key={industry.id}>
+            <CategoryCard industry={industry} />
+          </li>
+        ))}
+      </ul>
+      {withMentors.length > 0 && empty.length > 0 ? (
+        <p className="mt-5 text-sm text-muted-foreground">
+          No mentors yet in {empty.map((i) => i.name).join(", ")}.
+        </p>
+      ) : null}
+    </>
   );
 }
 
@@ -304,15 +321,39 @@ function CategorySkeleton() {
 async function FeaturedMentors() {
   const api = await getServerApi();
   const page = await api.mentors.search({ sort: "rating", page_size: 3 }).catch(() => null);
+  // Only claim "highly rated" when the mentors shown actually have reviews.
+  const reviewed = page?.results.some((m) => m.rating_count > 0) ?? false;
+  const heading = (
+    <div className="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <h2 id="featured-heading" className="text-2xl font-semibold sm:text-3xl">
+          {reviewed ? "Highly rated mentors" : "Meet our mentors"}
+        </h2>
+        <p className="mt-2 text-muted-foreground">
+          {reviewed
+            ? "Verified mentors with the best reviews from completed sessions."
+            : "Verified professionals offering one-to-one sessions."}
+        </p>
+      </div>
+      <Link href="/mentors" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+        See all mentors <ArrowRight className="size-4" aria-hidden="true" />
+      </Link>
+    </div>
+  );
   if (!page) {
     return (
-      <p className="mt-8 text-sm text-muted-foreground">
-        Mentors couldn&apos;t be loaded right now. Please try again shortly.
-      </p>
+      <>
+        {heading}
+        <p className="mt-8 text-sm text-muted-foreground">
+          Mentors couldn&apos;t be loaded right now. Please try again shortly.
+        </p>
+      </>
     );
   }
   if (page.results.length === 0) {
     return (
+      <>
+      {heading}
       <EmptyState
         className="mt-8"
         title="Mentors are joining soon"
@@ -323,16 +364,20 @@ async function FeaturedMentors() {
           </Button>
         }
       />
+      </>
     );
   }
   return (
-    <ul className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
-      {page.results.map((mentor) => (
-        <li key={mentor.id}>
-          <MentorCard mentor={mentor} />
-        </li>
-      ))}
-    </ul>
+    <>
+      {heading}
+      <ul className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+        {page.results.map((mentor) => (
+          <li key={mentor.id}>
+            <MentorCard mentor={mentor} />
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 

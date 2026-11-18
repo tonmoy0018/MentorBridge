@@ -40,6 +40,7 @@ TEMPLATES = {
     "booking_confirmed_mentor",
     "booking_declined_student",
     "booking_cancelled",
+    "seminar_cancelled",
     "booking_expired_student",
     "session_reminder",
     "payment_failed",

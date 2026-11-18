@@ -76,6 +76,18 @@ apps/payments/
 6. **Mentor accepts.** `POST /bookings/{id}/accept/` captures through the provider (idempotency key `capture-<payment id>`) and records the provider fee. The Payment becomes `captured`, the booking `confirmed`, and both parties are emailed. If the mentor has auto-accept on, step 6 happens inside step 5.
 7. **Student confirmation.** The browser returns to `/dashboard/student/bookings?checkout=<booking id>`. **That return proves nothing.** The page only re-reads the booking and shows whatever status the backend has, which only a verified webhook can have changed.
 
+### Multi-session bundles
+
+A bundle ("4 sessions, 10% off") is paid once, then each session is booked from it at no charge.
+
+1. `POST /packages/{id}/purchase/` with the chosen format creates a `PackagePurchase` (`pending_payment`, price from the server: sessions × session price in that format, minus the discount) and a `Payment` linked to the purchase instead of a booking. It returns the checkout URL. Repeating the request reuses the open checkout.
+2. The student pays on the provider's page (manual-capture checkout, like bookings).
+3. On the signed **authorised** webhook, the amount, currency and mode are checked as for bookings; there is no one to accept, so the payment is **captured at once** and the purchase becomes `active` with `expires_at` set. Only then can sessions be booked from it.
+4. Checkout expired or authorisation cancelled → purchase `cancelled`, nothing charged. A payment that arrives for a purchase that's no longer pending is released; a capture for one is refunded in full (`system`).
+5. Refunds are made by an admin from the payments page. A **full** refund (confirmed by the provider) marks the purchase `refunded`, so no more sessions can be booked; sessions already booked stay for the admin to handle.
+6. The browser returns to `/dashboard/student/packages?checkout=<purchase id>`; that page only re-reads the purchase.
+7. Earnings: the mentor's share counts as pending until every session is completed or the bundle expires.
+
 ### Payment states
 
 ```
@@ -164,6 +176,14 @@ Server-to-server API responses (capture, refund) are authenticated with our secr
    - `charge.dispute.created`, `charge.dispute.closed`
 2. Put the endpoint's signing secret in `STRIPE_WEBHOOK_SECRET`, and a **test** secret key (`sk_test_…`, or a restricted `rk_test_…`) in `STRIPE_SECRET_KEY`.
 3. Locally: run `stripe listen --forward-to localhost:8000/api/v1/payments/webhooks/stripe/` and use the `whsec_…` it prints.
+
+#### Local test mode, step by step
+
+1. Create a Stripe account and stay in **Test mode** (Stripe only lets businesses register from supported countries; test mode needs no business verification).
+2. Developers → API keys: copy the **Secret key** (`sk_test_…`). Never a live key.
+3. Install the Stripe CLI and run `stripe login`, then `stripe listen --forward-to localhost:8000/api/v1/payments/webhooks/stripe/`. Keep it running; copy the `whsec_…` it prints.
+4. Put both in the root `.env` (git-ignored), with `PAYMENT_PROVIDER=stripe`, then `make up` so the backend restarts with them.
+5. Pay with test card `4242 4242 4242 4242`, any future expiry and any CVC. The site shows a "Test mode" notice; no money moves.
 
 ## 6. Configuration
 

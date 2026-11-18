@@ -51,7 +51,7 @@ class RefundSerializer(serializers.ModelSerializer):
     commission_reversed = serializers.SerializerMethodField()
     mentor_share_reversed = serializers.SerializerMethodField()
     payment_id = serializers.UUIDField(source="payment.id", read_only=True)
-    booking_id = serializers.UUIDField(source="payment.booking_id", read_only=True)
+    booking_id = serializers.UUIDField(source="payment.booking_id", read_only=True, allow_null=True)
     initiated_by_name = serializers.SerializerMethodField()
 
     class Meta:
@@ -91,9 +91,13 @@ class RefundSerializer(serializers.ModelSerializer):
 
 
 class AdminPaymentSerializer(serializers.ModelSerializer):
-    booking_id = serializers.UUIDField(source="booking.id")
-    student_display_name = serializers.CharField(source="booking.student.full_name")
-    mentor_display_name = serializers.CharField(source="booking.mentor.user.full_name")
+    booking_id = serializers.UUIDField(allow_null=True, read_only=True)
+    package_purchase_id = serializers.UUIDField(
+        allow_null=True, read_only=True, help_text="Set when the payment is for a session bundle."
+    )
+    title = serializers.CharField(read_only=True, help_text="What was paid for.")
+    student_display_name = serializers.CharField(source="student.full_name")
+    mentor_display_name = serializers.CharField(source="mentor.user.full_name")
     amount = serializers.SerializerMethodField()
     platform_fee = serializers.SerializerMethodField()
     mentor_share = serializers.SerializerMethodField()
@@ -106,6 +110,8 @@ class AdminPaymentSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "booking_id",
+            "package_purchase_id",
+            "title",
             "student_display_name",
             "mentor_display_name",
             "amount",
